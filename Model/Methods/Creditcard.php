@@ -6,6 +6,8 @@
 
 namespace Mollie\Payment\Model\Methods;
 
+use Magento\Payment\Model\InfoInterface;
+use Magento\Sales\Api\Data\OrderInterface;
 use Mollie\Payment\Model\Mollie;
 
 /**
@@ -15,18 +17,24 @@ use Mollie\Payment\Model\Mollie;
  */
 class Creditcard extends Mollie
 {
-
     /**
      * Payment method code
      *
      * @var string
      */
-    protected $_code = 'mollie_methods_creditcard';
+    const CODE = 'mollie_methods_creditcard';
 
-    /**
-     * Info instructions block path
-     *
-     * @var string
-     */
-    protected $_infoBlockType = 'Mollie\Payment\Block\Info\Base';
+    public function authorize(InfoInterface $payment, $amount)
+    {
+        // Make sure the transaction is marked as pending so we don't get the wrong order state.
+        $payment->setIsTransactionPending(true);
+
+        /** @var OrderInterface $order */
+        $order = $payment->getOrder();
+
+        // Don't send the email just yet.
+        $order->setCanSendNewEmailFlag(false);
+
+        return parent::authorize($payment, $amount);
+    }
 }

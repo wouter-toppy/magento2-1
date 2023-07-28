@@ -3,13 +3,24 @@
 namespace Mollie\Payment\Test\Integration\Model;
 
 use Magento\Framework\DataObject;
+use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Quote\Model\Quote;
+use Magento\Sales\Api\Data\CreditmemoInterface;
 use Magento\Sales\Api\Data\OrderInterface;
+use Magento\Sales\Api\Data\OrderPaymentInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
+use Mollie\Api\Endpoints\MethodEndpoint;
 use Mollie\Api\Exceptions\ApiException;
+use Mollie\Api\MollieApiClient;
+use Mollie\Api\Resources\Payment;
+use Mollie\Payment\Helper\General;
 use Mollie\Payment\Model\Client\Orders;
 use Mollie\Payment\Model\Client\Payments;
+use Mollie\Payment\Model\Methods\Ideal;
 use Mollie\Payment\Model\Mollie;
+use Mollie\Payment\Test\Fakes\Model\Client\Orders\ProcessTransactionFake;
+use Mollie\Payment\Test\Fakes\Service\Mollie\FakeMollieApiClient;
 use Mollie\Payment\Test\Integration\IntegrationTestCase;
 
 class MollieTest extends IntegrationTestCase
@@ -34,24 +45,36 @@ class MollieTest extends IntegrationTestCase
         $order->setMollieTransactionId($orderId);
         $this->objectManager->get(OrderRepositoryInterface::class)->save($order);
 
-        $ordersApiMock = $this->createMock(Orders::class);
+        $mollieHelperMock = $this->createMock(General::class);
+        $mollieHelperMock->method('getApiKey')->willReturn('test_TEST_API_KEY_THAT_IS_LONG_ENOUGH');
+
         $paymentsApiMock = $this->createMock(Payments::class);
+        $orderProcessTransactionFake = $this->objectManager->create(ProcessTransactionFake::class);
+
+        $mollieApiMock = $this->createMock(\Mollie\Payment\Service\Mollie\MollieApiClient::class);
+        $mollieApiMock->method('loadByStore')->willReturn(new \Mollie\Api\MollieApiClient);
 
         if ($type == 'orders') {
-            $ordersApiMock->expects($this->once())->method('processTransaction');
+            $orderProcessTransactionFake->disableParentCall();
         }
 
         if ($type == 'payments') {
-            $paymentsApiMock->expects($this->once())->method('processTransaction');
+            $paymentsApiMock->expects($this->once())->method('processTransaction')->willReturn(['success' => true]);
         }
 
         /** @var Mollie $instance */
         $instance = $this->objectManager->create(Mollie::class, [
-            'ordersApi' => $ordersApiMock,
             'paymentsApi' => $paymentsApiMock,
+            'mollieHelper' => $mollieHelperMock,
+            'ordersProcessTraction' => $orderProcessTransactionFake,
+            'mollieApiClient' => $mollieApiMock,
         ]);
 
         $instance->processTransaction($order->getEntityId());
+
+        if ($type == 'orders') {
+            $this->assertEquals(1, $orderProcessTransactionFake->getTimesCalled());
+        }
     }
 
     public function testStartTransactionWithMethodOrder()
@@ -59,6 +82,7 @@ class MollieTest extends IntegrationTestCase
         /** @var OrderInterface $order */
         $order = $this->objectManager->create(OrderInterface::class);
         $order->setEntityId(1);
+        $order->setPayment($this->objectManager->create(OrderPaymentInterface::class));
 
         $helperMock = $this->createMock(\Mollie\Payment\Helper\General::class);
         $helperMock->method('getApiKey')->willReturn('test_dummyapikeywhichmustbe30characterslong');
@@ -87,6 +111,7 @@ class MollieTest extends IntegrationTestCase
         /** @var OrderInterface $order */
         $order = $this->objectManager->create(OrderInterface::class);
         $order->setEntityId(1);
+        $order->setPayment($this->objectManager->create(OrderPaymentInterface::class));
 
         $helperMock = $this->createMock(\Mollie\Payment\Helper\General::class);
         $helperMock->method('getApiKey')->willReturn('test_dummyapikeywhichmustbe30characterslong');
@@ -120,6 +145,7 @@ class MollieTest extends IntegrationTestCase
         /** @var OrderInterface $order */
         $order = $this->objectManager->create(OrderInterface::class);
         $order->setEntityId(1);
+        $order->setPayment($this->objectManager->create(OrderPaymentInterface::class));
 
         $helperMock = $this->createMock(\Mollie\Payment\Helper\General::class);
         $helperMock->method('getApiKey')->willReturn('test_dummyapikeywhichmustbe30characterslong');
@@ -196,6 +222,11 @@ class MollieTest extends IntegrationTestCase
     {
         $this->expectException(LocalizedException::class);
 
+        $encryptorMock = $this->createMock(EncryptorInterface::class);
+        $encryptorMock->method('decrypt')->willReturn('test_dummyapikeywhichmustbe30characterslong');
+
+        $mollieHelper = $this->objectManager->create(General::class, ['encryptor' => $encryptorMock]);
+
         $order = $this->loadOrder('100000001');
         $order->getPayment()->setMethod('mollie_methods_voucher');
 
@@ -211,8 +242,114 @@ class MollieTest extends IntegrationTestCase
         $instance = $this->objectManager->create(Mollie::class, [
             'ordersApi' => $ordersApi,
             'paymentsApi' => $paymentsApi,
+            'mollieHelper' => $mollieHelper,
         ]);
 
         $instance->startTransaction($order);
+    }
+
+    public function testGetIssuersHasAnSequentialIndex()
+    {
+        $response = new \stdClass();
+        $response->issuers = [
+            ['id' => 'ZZissuer', 'name' => 'ZZissuer'],
+            ['id' => 'AAissuer', 'name' => 'AAissuer'],
+        ];
+
+        $methodEndpointMock = $this->createMock(MethodEndpoint::class);
+        $methodEndpointMock->method('get')->willReturn($response);
+
+        $mollieApi = new MollieApiClient;
+        $mollieApi->methods = $methodEndpointMock;
+
+        /** @var Mollie $instance */
+        $instance = $this->objectManager->create(Mollie::class);
+
+        $result = $instance->getIssuers($mollieApi, 'mollie_methods_ideal', 'radio');
+
+        $this->assertSame(array_values($result), $result);
+    }
+
+    /**
+     * @magentoConfigFixture default_store payment/mollie_general/enabled 1
+     * @magentoConfigFixture default_store payment/mollie_methods_ideal/active 1
+     * @magentoConfigFixture default_store payment/mollie_general/apikey_test test_dummyapikeywhichmustbe30characterslong
+     * @magentoConfigFixture default_store payment/mollie_general/type test
+     */
+    public function testIsNotAvailableForLongSteetnames(): void
+    {
+        $this->loadFakeEncryptor()->addReturnValue(
+            'test_dummyapikeywhichmustbe30characterslong',
+            'test_dummyapikeywhichmustbe30characterslong'
+        );
+
+        /** @var Ideal $instance */
+        $instance = $this->objectManager->create(Ideal::class);
+
+        $quote = $this->objectManager->create(Quote::class);
+        $quote->getShippingAddress()->setStreetFull(str_repeat('tenletters', 10) . 'a');
+
+        $this->assertFalse($instance->isAvailable($quote));
+    }
+
+    /**
+     * @magentoDataFixture Magento/Sales/_files/order.php
+     * @magentoConfigFixture default_store payment/mollie_general/currency 0
+     * @magentoConfigFixture default_store payment/mollie_general/type test
+     * @magentoConfigFixture default_store payment/mollie_general/apikey_test test_dummyapikeywhichmustbe30characterslong
+     *
+     * @return void
+     * @throws LocalizedException
+     */
+    public function testRefundsInTheCorrectAmount(): void
+    {
+        $order = $this->loadOrder('100000001');
+        $order->setMollieTransactionId('tr_12345');
+
+        $paymentMock = $this->createMock(Payment::class);
+        $paymentMock->method('refund')->with($this->callback(function ($parameters) {
+            $this->assertEquals(56.78, $parameters['amount']['value']);
+
+            return true;
+        }));
+
+        $client = $this->loadFakeMollieApiClient();
+        $client->returnFakePayment($paymentMock);
+
+        /** @var Mollie $instance */
+        $instance = $this->objectManager->create(Mollie::class);
+
+        /** @var $infoPayment $infoPayment */
+        $infoPayment = $this->objectManager->get(\Magento\Sales\Model\Order\Payment::class);
+        $infoPayment->setOrder($order);
+
+        $creditmemo = $this->objectManager->create(CreditmemoInterface::class);
+        $creditmemo->setBaseGrandTotal(12.34);
+        $creditmemo->setGrandTotal(56.78);
+        $infoPayment->setCreditmemo($creditmemo);
+
+        $instance->refund($infoPayment, 12.34);
+    }
+
+    /**
+     * @magentoConfigFixture default_store payment/mollie_general/enabled 1
+     * @magentoConfigFixture default_store payment/mollie_methods_ideal/active 1
+     * @magentoConfigFixture default_store payment/mollie_general/apikey_test test_dummyapikeywhichmustbe30characterslong
+     * @magentoConfigFixture default_store payment/mollie_general/type test
+     */
+    public function testIsAvailableForValidStreetnames(): void
+    {
+        $this->loadFakeEncryptor()->addReturnValue(
+            'test_dummyapikeywhichmustbe30characterslong',
+            'test_dummyapikeywhichmustbe30characterslong'
+        );
+
+        /** @var Ideal $instance */
+        $instance = $this->objectManager->create(Ideal::class);
+
+        $quote = $this->objectManager->create(Quote::class);
+        $quote->getShippingAddress()->setStreetFull(str_repeat('tenletters', 10));
+
+        $this->assertTrue($instance->isAvailable($quote));
     }
 }

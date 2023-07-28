@@ -11,11 +11,12 @@ define(
     ) {
         'use strict';
         var defaultComponent = 'Mollie_Payment/js/view/payment/method-renderer/default';
+        var billieComponent = 'Mollie_Payment/js/view/payment/method-renderer/billie';
         var idealComponent = 'Mollie_Payment/js/view/payment/method-renderer/ideal';
-        var kbcComponent = 'Mollie_Payment/js/view/payment/method-renderer/kbc';
         var giftcardComponent = 'Mollie_Payment/js/view/payment/method-renderer/giftcard';
+        var kbcComponent = 'Mollie_Payment/js/view/payment/method-renderer/kbc';
 
-        var creditcardComponent = defaultComponent;
+        var creditcardComponent = 'Mollie_Payment/js/view/payment/method-renderer/creditcard';
         var checkoutConfig = window.checkoutConfig.payment.mollie;
         if (checkoutConfig.profile_id && checkoutConfig.creditcard.use_components) {
             creditcardComponent = 'Mollie_Payment/js/view/payment/method-renderer/creditcard-with-components';
@@ -25,20 +26,24 @@ define(
             {type: 'mollie_methods_bancontact', component: defaultComponent},
             {type: 'mollie_methods_banktransfer', component: defaultComponent},
             {type: 'mollie_methods_belfius', component: defaultComponent},
+            {type: 'mollie_methods_billie', component: billieComponent},
             {type: 'mollie_methods_creditcard', component: creditcardComponent},
             {type: 'mollie_methods_directdebit', component: defaultComponent},
+            {type: 'mollie_methods_eps', component: defaultComponent},
+            {type: 'mollie_methods_giftcard', component: giftcardComponent},
             {type: 'mollie_methods_ideal', component: idealComponent},
+            {type: 'mollie_methods_in3', component: defaultComponent},
+            {type: 'mollie_methods_giropay', component: defaultComponent},
             {type: 'mollie_methods_kbc', component: kbcComponent},
+            {type: 'mollie_methods_klarna', component: defaultComponent},
+            {type: 'mollie_methods_klarnapaylater', component: defaultComponent},
+            {type: 'mollie_methods_klarnapaynow', component: defaultComponent},
+            {type: 'mollie_methods_klarnasliceit', component: defaultComponent},
+            {type: 'mollie_methods_mybank', component: defaultComponent},
             {type: 'mollie_methods_paypal', component: defaultComponent},
             {type: 'mollie_methods_paysafecard', component: defaultComponent},
-            {type: 'mollie_methods_sofort', component: defaultComponent},
-            {type: 'mollie_methods_giropay', component: defaultComponent},
-            {type: 'mollie_methods_eps', component: defaultComponent},
-            {type: 'mollie_methods_klarnapaylater', component: defaultComponent},
-            {type: 'mollie_methods_klarnasliceit', component: defaultComponent},
-            {type: 'mollie_methods_giftcard', component: giftcardComponent},
             {type: 'mollie_methods_przelewy24', component: defaultComponent},
-            {type: 'mollie_methods_mybank', component: defaultComponent},
+            {type: 'mollie_methods_sofort', component: defaultComponent},
             {type: 'mollie_methods_voucher', component: defaultComponent}
         ];
 
@@ -57,7 +62,7 @@ define(
          */
         if (canUseApplePay()) {
             var applePayComponent = defaultComponent;
-            if (checkoutConfig.appleypay.integration_type === 'direct') {
+            if (checkoutConfig.applepay.integration_type === 'direct') {
                 applePayComponent = 'Mollie_Payment/js/view/payment/method-renderer/applepay-direct';
             }
 

@@ -12,7 +12,7 @@ class WebhookTest extends ControllerTestCase
     {
         $mollieModel = $this->createMock(Mollie::class);
         $mollieModel->method('getOrderIdsByTransactionId')->willReturn([123]);
-        $mollieModel->method('processTransaction')->willThrowException(new \Exception('[TEST] Something went wrong'));
+        $mollieModel->method('processTransaction')->willThrowException(new \Exception('[TEST] Transaction failed. Please verify your billing information and payment method, and try again.'));
 
         $this->_objectManager->addSharedInstance($mollieModel, Mollie::class);
 
@@ -35,20 +35,20 @@ class WebhookTest extends ControllerTestCase
         $this->assertOkResponse();
     }
 
-    public function testReturns404IfNoTransactionIdProvided()
+    public function testReturns200IfNoTransactionIdProvided()
     {
         $this->dispatch('mollie/checkout/webhook');
 
-        $this->assertEquals(404, $this->getResponse()->getStatusCode());
+        $this->assertEquals(200, $this->getResponse()->getStatusCode());
     }
 
-    public function testReturns404IfAnInvalidTransactionIdIsProvided()
+    public function testReturns200IfAnInvalidTransactionIdIsProvided()
     {
         $this->getRequest()->setParam('id', 'NON_EXISTING');
 
         $this->dispatch('mollie/checkout/webhook');
 
-        $this->assertEquals(404, $this->getResponse()->getStatusCode());
+        $this->assertEquals(200, $this->getResponse()->getStatusCode());
     }
 
     private function assertOkResponse()

@@ -10,15 +10,17 @@ use Magento\Framework\Api\SearchCriteriaBuilder;
 use Magento\Framework\Filesystem\DirectoryList;
 use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
+use Magento\TestFramework\Annotation\DataFixture;
 use Magento\TestFramework\ObjectManager;
+use Mollie\Payment\Service\Mollie\MollieApiClient;
+use Mollie\Payment\Test\Fakes\Service\Mollie\FakeMollieApiClient;
+use Mollie\Payment\Test\Integration\PHPUnit\IntegrationTestCaseTrait;
+use Magento\TestFramework\Workaround\Override\Fixture\Resolver;
 use PHPUnit\Framework\TestCase;
 
 class IntegrationTestCase extends TestCase
 {
-    /**
-     * @var ObjectManager
-     */
-    protected $objectManager;
+    use IntegrationTestCaseTrait;
 
     protected function setUp(): void
     {
@@ -74,6 +76,11 @@ class IntegrationTestCase extends TestCase
             throw new \Exception('The path "' . $fullPath . '" does not exists');
         }
 
+        if (class_exists(Resolver::class)) {
+            $resolver = Resolver::getInstance();
+            $resolver->setCurrentFixtureType(DataFixture::ANNOTATION);
+        }
+
         chdir($this->getRootDirectory() . '/dev/tests/integration/testsuite/');
         require $fullPath;
         chdir($cwd);
@@ -106,5 +113,14 @@ class IntegrationTestCase extends TestCase
         $orderList = $orderRepository->getList($searchCriteria)->getItems();
 
         return array_shift($orderList);
+    }
+
+    public function loadFakeMollieApiClient(): FakeMollieApiClient
+    {
+        $client = $this->objectManager->create(FakeMollieApiClient::class);
+
+        $this->objectManager->addSharedInstance($client, MollieApiClient::class);
+
+        return $client;
     }
 }

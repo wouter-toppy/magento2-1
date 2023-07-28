@@ -6,6 +6,8 @@
 
 namespace Mollie\Payment\Controller\Checkout;
 
+use Magento\Framework\App\ResponseInterface;
+use Magento\Framework\DataObject;
 use Magento\Framework\Event\ManagerInterface;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Sales\Api\OrderRepositoryInterface;
@@ -15,6 +17,7 @@ use Magento\Payment\Helper\Data as PaymentHelper;
 use Magento\Framework\App\Action\Action;
 use Magento\Framework\App\Action\Context;
 use Magento\Checkout\Model\Session;
+use Mollie\Payment\Service\Order\RedirectOnError;
 
 /**
  * Class Process
@@ -52,15 +55,10 @@ class Process extends Action
     private $eventManager;
 
     /**
-     * Process constructor.
-     *
-     * @param Context $context
-     * @param Session $checkoutSession
-     * @param PaymentHelper $paymentHelper
-     * @param MollieModel $mollieModel
-     * @param MollieHelper $mollieHelper
-     * @param OrderRepositoryInterface $orderRepository
+     * @var RedirectOnError
      */
+    private $redirectOnError;
+
     public function __construct(
         Context $context,
         Session $checkoutSession,
@@ -68,6 +66,7 @@ class Process extends Action
         MollieModel $mollieModel,
         MollieHelper $mollieHelper,
         OrderRepositoryInterface $orderRepository,
+        RedirectOnError $redirectOnError,
         ManagerInterface $eventManager
     ) {
         $this->checkoutSession = $checkoutSession;
@@ -75,7 +74,9 @@ class Process extends Action
         $this->mollieModel = $mollieModel;
         $this->mollieHelper = $mollieHelper;
         $this->orderRepository = $orderRepository;
+        $this->redirectOnError = $redirectOnError;
         $this->eventManager = $eventManager;
+
         parent::__construct($context);
     }
 
@@ -88,8 +89,7 @@ class Process extends Action
         if (!$orderIds) {
             $this->mollieHelper->addTolog('error', __('Invalid return, missing order id.'));
             $this->messageManager->addNoticeMessage(__('Invalid return from Mollie.'));
-            $this->_redirect('checkout/cart');
-            return;
+            return $this->_redirect($this->redirectOnError->getUrl());
         }
 
         try {
@@ -101,31 +101,37 @@ class Process extends Action
         } catch (\Exception $e) {
             $this->mollieHelper->addTolog('error', $e->getMessage());
             $this->messageManager->addExceptionMessage($e, __('There was an error checking the transaction status.'));
-            $this->_redirect('checkout/cart');
-            return;
+            return $this->_redirect($this->redirectOnError->getUrl());
         }
 
         if (!empty($result['success'])) {
             try {
                 $this->checkoutSession->start();
 
-                $this->_redirect('checkout/onepage/success?utm_nooverride=1');
+                $redirect = new DataObject([
+                    'path' => 'checkout/onepage/success',
+                    'query' => ['utm_nooverride' => 1],
+                ]);
 
                 $this->eventManager->dispatch('mollie_checkout_success_redirect', [
+                    'redirect' => $redirect,
                     'order_ids' => $orderIds,
                     'request' => $this->getRequest(),
                     'response' => $this->getResponse(),
                 ]);
+
+                return $this->_redirect($redirect->getData('path'), [
+                    '_query' => $redirect->getData('query'),
+                    '_use_rewrite' => false,
+                ]);
             } catch (\Exception $e) {
                 $this->mollieHelper->addTolog('error', $e->getMessage());
-                $this->messageManager->addErrorMessage(__('Something went wrong.'));
-                $this->_redirect('checkout/cart');
+                $this->messageManager->addErrorMessage(__('Transaction failed. Please verify your billing information and payment method, and try again.'));
+                return $this->_redirect($this->redirectOnError->getUrl());
             }
-
-            return;
         }
 
-        $this->handleNonSuccessResult($result, $orderIds);
+        return $this->handleNonSuccessResult($result, $orderIds);
     }
 
     /**
@@ -140,13 +146,13 @@ class Process extends Action
         return $this->getRequest()->getParam('order_ids') ?? [];
     }
 
-    protected function handleNonSuccessResult(array $result, array $orderIds)
+    protected function handleNonSuccessResult(array $result, array $orderIds): ResponseInterface
     {
         $this->checkIfLastRealOrder($orderIds);
         $this->checkoutSession->restoreQuote();
         $this->addResultMessage($result);
 
-        $this->_redirect('checkout/cart');
+        return $this->_redirect($this->redirectOnError->getUrl());
     }
 
     /**
@@ -155,7 +161,7 @@ class Process extends Action
     protected function addResultMessage(array $result)
     {
         if (!isset($result['status'])) {
-            $this->messageManager->addErrorMessage(__('Something went wrong.'));
+            $this->messageManager->addErrorMessage(__('Transaction failed. Please verify your billing information and payment method, and try again.'));
             return;
         }
 
@@ -169,7 +175,7 @@ class Process extends Action
             return;
         }
 
-        $this->messageManager->addErrorMessage(__('Something went wrong.'));
+        $this->messageManager->addErrorMessage(__('Transaction failed. Please verify your billing information and payment method, and try again.'));
     }
 
     /**

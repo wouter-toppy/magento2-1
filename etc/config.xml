@@ -3,7 +3,7 @@
     <default>
         <payment>
             <mollie_general>
-                <version>v1.26.1</version>
+                <version>v2.29.0</version>
                 <active>0</active>
                 <enabled>0</enabled>
                 <type>test</type>
@@ -12,6 +12,8 @@
                 <order_status_processing>processing</order_status_processing>
                 <invoice_moment>authorize</invoice_moment>
                 <invoice_notify>1</invoice_notify>
+                <invoice_notify_klarna>1</invoice_notify_klarna>
+                <!-- Deprecated option -->
                 <loading_screen>0</loading_screen>
                 <debug>1</debug>
                 <model>Mollie\Payment\Model\Methods\General</model>
@@ -19,18 +21,39 @@
                 <cancel_failed_orders>0</cancel_failed_orders>
                 <use_custom_redirect_url>0</use_custom_redirect_url>
                 <second_chance_email_template>mollie_second_chance_email_second_chance_email_second_chance_email_template</second_chance_email_template>
-                <dashboard_url_orders_api>https://www.mollie.com/dashboard/orders/{id}</dashboard_url_orders_api>
-                <dashboard_url_payments_api>https://www.mollie.com/dashboard/payments/{id}</dashboard_url_payments_api>
+                <dashboard_url_orders_api>https://my.mollie.com/dashboard/orders/{id}</dashboard_url_orders_api>
+                <dashboard_url_payments_api>https://my.mollie.com/dashboard/payments/{id}</dashboard_url_payments_api>
                 <use_webhooks>enabled</use_webhooks>
                 <automatically_send_second_chance_emails>0</automatically_send_second_chance_emails>
                 <second_chance_email_delay>1</second_chance_email_delay>
+                <second_chance_use_payment_method>use_method_of_original_order</second_chance_use_payment_method>
+                <redirect_when_transaction_fails_to>redirect_to_cart</redirect_when_transaction_fails_to>
+                <enable_magento_vault>0</enable_magento_vault>
+                <apikey_test backend_model="Magento\Config\Model\Config\Backend\Encrypted" />
+                <apikey_live backend_model="Magento\Config\Model\Config\Backend\Encrypted" />
+                <encrypt_payment_details>0</encrypt_payment_details>
+                <enable_manual_capture>0</enable_manual_capture>
             </mollie_general>
+            <mollie_methods_general>
+                <model>Mollie\Payment\Model\Methods\General</model>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
+            </mollie_methods_general>
             <mollie_methods_applepay>
                 <active>0</active>
                 <model>Mollie\Payment\Model\Methods\ApplePay</model>
                 <enable_buy_now_button>0</enable_buy_now_button>
                 <buy_now_button_color>black</buy_now_button_color>
                 <buy_now_button_text>check-out</buy_now_button_text>
+                <minicart_button_color>black</minicart_button_color>
+                <minicart_button_text>check-out</minicart_button_text>
                 <title>Apple Pay</title>
                 <payment_description>{ordernumber}</payment_description>
                 <method>payment</method>
@@ -38,6 +61,15 @@
                 <allowspecific>0</allowspecific>
                 <instructions/>
                 <integration_type>external</integration_type>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_applepay>
             <mollie_methods_bancontact>
                 <active>1</active>
@@ -48,6 +80,15 @@
                 <payment_action>order</payment_action>
                 <allowspecific>0</allowspecific>
                 <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_bancontact>
             <mollie_methods_banktransfer>
                 <active>1</active>
@@ -60,6 +101,15 @@
                 <payment_action>order</payment_action>
                 <allowspecific>0</allowspecific>
                 <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_banktransfer>
             <mollie_methods_belfius>
                 <active>1</active>
@@ -70,17 +120,61 @@
                 <payment_action>order</payment_action>
                 <allowspecific>0</allowspecific>
                 <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_belfius>
+            <mollie_methods_billie>
+                <active>1</active>
+                <model>Mollie\Payment\Model\Methods\Billie</model>
+                <title>Billie</title>
+                <payment_description>{ordernumber}</payment_description>
+                <method>order</method>
+                <payment_action>order</payment_action>
+                <allowspecific>0</allowspecific>
+                <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>1</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
+            </mollie_methods_billie>
             <mollie_methods_creditcard>
                 <active>1</active>
                 <model>Mollie\Payment\Model\Methods\Creditcard</model>
                 <title>Credit Cards</title>
                 <payment_description>{ordernumber}</payment_description>
                 <method>payment</method>
-                <payment_action>order</payment_action>
+                <payment_action>authorize</payment_action>
                 <allowspecific>0</allowspecific>
                 <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>1</can_authorize_vault>
+                <instant_purchase>
+                    <supported>1</supported>
+                    <available>Mollie\Payment\Service\InstantPurchase\AvailabilityCheck</available>
+                </instant_purchase>
             </mollie_methods_creditcard>
+            <mollie_methods_creditcard_vault>
+                <title>Stored Card (Mollie)</title>
+                <model>Mollie\Payment\Model\Methods\CreditcardVault</model>
+            </mollie_methods_creditcard_vault>
             <mollie_methods_directdebit>
                 <active>0</active>
                 <model>Mollie\Payment\Model\Methods\Directdebit</model>
@@ -90,6 +184,15 @@
                 <payment_action>order</payment_action>
                 <allowspecific>0</allowspecific>
                 <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_directdebit>
             <mollie_methods_eps>
                 <active>1</active>
@@ -100,6 +203,15 @@
                 <payment_action>order</payment_action>
                 <allowspecific>0</allowspecific>
                 <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_eps>
             <mollie_methods_giftcard>
                 <active>1</active>
@@ -111,6 +223,15 @@
                 <payment_action>order</payment_action>
                 <allowspecific>0</allowspecific>
                 <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>0</can_refund>
+                <can_refund_partial_per_invoice>0</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_giftcard>
             <mollie_methods_giropay>
                 <active>1</active>
@@ -121,6 +242,15 @@
                 <payment_action>order</payment_action>
                 <allowspecific>0</allowspecific>
                 <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_giropay>
             <mollie_methods_ideal>
                 <active>1</active>
@@ -128,11 +258,39 @@
                 <title>iDeal</title>
                 <payment_description>{ordernumber}</payment_description>
                 <method>payment</method>
-                <issuer_list_type>dropdown</issuer_list_type>
+                <issuer_list_type>radio</issuer_list_type>
                 <payment_action>order</payment_action>
                 <allowspecific>0</allowspecific>
                 <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_ideal>
+            <mollie_methods_in3>
+                <active>1</active>
+                <model>Mollie\Payment\Model\Methods\In3</model>
+                <title>in3</title>
+                <payment_description>{ordernumber}</payment_description>
+                <method>order</method>
+                <payment_action>order</payment_action>
+                <allowspecific>0</allowspecific>
+                <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>1</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
+            </mollie_methods_in3>
             <mollie_methods_kbc>
                 <active>1</active>
                 <model>Mollie\Payment\Model\Methods\Kbc</model>
@@ -143,7 +301,36 @@
                 <issuer_list_type>none</issuer_list_type>
                 <allowspecific>0</allowspecific>
                 <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_kbc>
+            <mollie_methods_klarna>
+                <active>1</active>
+                <model>Mollie\Payment\Model\Methods\Klarna</model>
+                <title>Pay with Klarna.</title>
+                <payment_description>{ordernumber}</payment_description>
+                <method>order</method>
+                <payment_action>order</payment_action>
+                <allowspecific>1</allowspecific>
+                <specificcountry>GB</specificcountry>
+                <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>1</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
+            </mollie_methods_klarna>
             <mollie_methods_klarnapaylater>
                 <active>1</active>
                 <model>Mollie\Payment\Model\Methods\Klarnapaylater</model>
@@ -153,7 +340,35 @@
                 <payment_action>order</payment_action>
                 <allowspecific>0</allowspecific>
                 <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>1</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_klarnapaylater>
+            <mollie_methods_klarnapaynow>
+                <active>1</active>
+                <model>Mollie\Payment\Model\Methods\Klarnapaynow</model>
+                <title>Klarna Pay Now</title>
+                <payment_description>{ordernumber}</payment_description>
+                <method>order</method>
+                <payment_action>order</payment_action>
+                <allowspecific>0</allowspecific>
+                <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>1</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
+            </mollie_methods_klarnapaynow>
             <mollie_methods_klarnasliceit>
                 <active>1</active>
                 <model>Mollie\Payment\Model\Methods\Klarnasliceit</model>
@@ -163,6 +378,15 @@
                 <payment_action>order</payment_action>
                 <allowspecific>0</allowspecific>
                 <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>1</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_klarnasliceit>
             <mollie_methods_mybank>
                 <active>1</active>
@@ -173,6 +397,15 @@
                 <payment_action>order</payment_action>
                 <allowspecific>0</allowspecific>
                 <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_mybank>
             <mollie_methods_paymentlink>
                 <active>1</active>
@@ -184,16 +417,35 @@
                 <allowspecific>0</allowspecific>
                 <message><![CDATA[Click <a href="%link%">here</a> to pay for your purchase.]]></message>
                 <instructions/>
+                <can_initialize>1</can_initialize>
+                <can_use_checkout>0</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>1</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_paymentlink>
             <mollie_methods_paypal>
                 <active>1</active>
                 <model>Mollie\Payment\Model\Methods\Paypal</model>
-                <title>Paypal</title>
+                <title>PayPal</title>
                 <payment_description>{ordernumber}</payment_description>
                 <method>payment</method>
                 <payment_action>order</payment_action>
                 <allowspecific>0</allowspecific>
                 <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_paypal>
             <mollie_methods_paysafecard>
                 <active>1</active>
@@ -204,6 +456,15 @@
                 <payment_action>order</payment_action>
                 <allowspecific>0</allowspecific>
                 <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_paysafecard>
             <mollie_methods_przelewy24>
                 <active>1</active>
@@ -214,6 +475,15 @@
                 <payment_action>order</payment_action>
                 <allowspecific>0</allowspecific>
                 <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_przelewy24>
             <mollie_methods_sofort>
                 <active>1</active>
@@ -224,6 +494,15 @@
                 <payment_action>order</payment_action>
                 <allowspecific>0</allowspecific>
                 <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_sofort>
             <mollie_methods_reorder>
                 <active>1</active>
@@ -233,6 +512,16 @@
                 <method>order</method>
                 <payment_action>order</payment_action>
                 <allowspecific>0</allowspecific>
+                <can_initialize>1</can_initialize>
+                <can_use_checkout>0</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>1</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_reorder>
             <mollie_methods_voucher>
                 <active>0</active>
@@ -244,6 +533,15 @@
                 <payment_action>order</payment_action>
                 <allowspecific>0</allowspecific>
                 <instructions/>
+                <can_use_checkout>1</can_use_checkout>
+                <can_order>1</can_order>
+                <can_refund>1</can_refund>
+                <can_refund_partial_per_invoice>1</can_refund_partial_per_invoice>
+                <can_use_internal>0</can_use_internal>
+                <can_cancel>1</can_cancel>
+                <can_authorize>0</can_authorize>
+                <can_authorize_vault>0</can_authorize_vault>
+                <can_edit>1</can_edit>
             </mollie_methods_voucher>
         </payment>
         <sales>

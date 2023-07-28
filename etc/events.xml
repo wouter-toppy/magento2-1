@@ -7,7 +7,12 @@
         <observer name="mollie_cancel_order" instance="Mollie\Payment\Observer\OrderCancelAfter"/>
     </event>
     <event name="sales_order_shipment_save_before">
-        <observer name="mollie_create_shipment" instance="Mollie\Payment\Observer\SalesOrderShipmentSaveBefore"/>
+        <!-- Order of execution is important -->
+        <observer name="mollie_aaaa_lock_unlock_order" instance="Mollie\Payment\Observer\LockUnlockOrder" />
+        <observer name="mollie_create_shipment" instance="Mollie\Payment\Observer\SalesOrderShipmentSaveBefore\CreateMollieShipment"/>
+    </event>
+    <event name="sales_order_shipment_save_after">
+        <observer name="mollie_lock_unlock_order" instance="Mollie\Payment\Observer\LockUnlockOrder" />
     </event>
     <event name="sales_order_shipment_track_save_after">
         <observer name="mollie_create_shipment" instance="Mollie\Payment\Observer\SalesOrderShipmentTrackSaveAfter"/>
@@ -23,6 +28,7 @@
     </event>
     <event name="sales_model_service_quote_submit_success">
         <observer name="mollie_attach_payment_token_to_order" instance="Mollie\Payment\Observer\SalesModelServiceQuoteSubmitSuccess\AttachPaymentTokenToOrder" />
+        <observer name="mollie_starttransaction_for_paymentlink_orders" instance="Mollie\Payment\Observer\SalesModelServiceQuoteSubmitSuccess\StartTransactionForPaymentLinkOrders" />
     </event>
     <event name="mollie_start_transaction">
         <observer name="mollie_save_pending_payment_reminder" instance="Mollie\Payment\Observer\MollieStartTransaction\SavePendingOrder" />
@@ -35,5 +41,26 @@
     </event>
     <event name="sales_order_place_before">
         <observer name="mollie_remove_from_pending_payment_reminders_table" instance="Mollie\Payment\Observer\SalesOrderPlaceBefore\RemovePendingPaymentReminders" />
+    </event>
+    <event name="checkout_allow_guest">
+        <observer name="mollie_force_customer_login_when_ordering_a_recurring_product" instance="Mollie\Payment\Observer\CheckoutAllowGuest\ForceCustomerLoginWhenSubscriptionItemInCart" />
+    </event>
+    <event name="checkout_submit_all_after">
+        <observer name="mollie_starttransaction_for_instant_purchase_orders" instance="Mollie\Payment\Observer\CheckoutSubmitAllAfter\StartTransactionForInstantPurchaseOrders" />
+    </event>
+    <event name="sales_quote_item_set_product">
+        <observer name="mollie_add_subscription_product_type_options" instance="Mollie\Payment\Observer\SalesQuoteItemSetProduct\SetSubscriptionDataOnBuyRequest" />
+    </event>
+    <event name="shortcut_buttons_container">
+        <observer name="mollie_add_applepay_button_to_minicart" instance="Mollie\Payment\Observer\ShortcutButtonsContainer\AddApplePayShortcutButton" />
+    </event>
+    <event name="sales_order_payment_place_end">
+        <observer name="mollie_set_order_state_to_pending_payment" instance="Mollie\Payment\Observer\SalesOrderPaymentPlaceEnd\SetOrderStateToPendingPayment" />
+    </event>
+    <event name="sales_order_invoice_pay">
+        <observer name="mollie_mark_virtual_items_as_shipped" instance="Mollie\Payment\Observer\SalesOrderInvoicePay\MarkVirtualItemsAsShipped" />
+    </event>
+    <event name="sales_quote_payment_import_data_before">
+        <observer name="mollie_clear_issuer_on_method_change" instance="Mollie\Payment\Observer\SalesQuotePaymentImportDataBefore\ClearIssuerOnMethodChange" />
     </event>
 </config>

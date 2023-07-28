@@ -13,7 +13,10 @@ use Magento\Framework\View\Element\Template\Context;
 use Magento\Framework\Stdlib\DateTime;
 use Magento\Sales\Api\Data\OrderInterface;
 use Mollie\Payment\Helper\General as MollieHelper;
+use Mollie\Payment\Model\Methods\Billie;
+use Mollie\Payment\Model\Methods\Klarna;
 use Mollie\Payment\Model\Methods\Klarnapaylater;
+use Mollie\Payment\Model\Methods\Klarnapaynow;
 use Mollie\Payment\Model\Methods\Klarnasliceit;
 
 class Base extends Info
@@ -158,13 +161,15 @@ class Base extends Info
     }
 
     /**
-     * @return mixed
+     * @return bool
      */
-    public function isKlarnaMethod()
+    public function isBuyNowPayLaterMethod(): bool
     {
         try {
             $code = $this->getInfo()->getMethod();
-            if ($code == Klarnapaylater::METHOD_CODE || $code == Klarnasliceit::METHOD_CODE) {
+            $methods = [Billie::CODE, Klarna::CODE, Klarnapaylater::CODE, Klarnasliceit::CODE, Klarnapaynow::CODE];
+
+            if (in_array($code, $methods)) {
                 return true;
             }
         } catch (\Exception $e) {
@@ -189,7 +194,7 @@ class Base extends Info
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getOrderId()
     {
@@ -197,6 +202,7 @@ class Base extends Info
             return $this->getInfo()->getParentId();
         } catch (\Exception $e) {
             $this->mollieHelper->addTolog('error', $e->getMessage());
+            return null;
         }
     }
 

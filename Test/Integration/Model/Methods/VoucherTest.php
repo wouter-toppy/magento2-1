@@ -7,6 +7,7 @@
 namespace Mollie\Payment\Test\Integration\Model\Methods;
 
 use Magento\Quote\Api\Data\CartInterface;
+use Mollie\Payment\Helper\General;
 use Mollie\Payment\Model\Methods\Voucher;
 use Mollie\Payment\Test\Integration\IntegrationTestCase;
 
@@ -32,17 +33,22 @@ class VoucherTest extends IntegrationTestCase
     }
 
     /**
-     * @magentoConfigFixture default_store payment/mollie_general/apikey_test test_dummyapikeywhichmustbe30characterslong
      * @magentoConfigFixture default_store payment/mollie_methods_voucher/category meal
      * @magentoConfigFixture default_store payment/mollie_methods_voucher/active 1
      * @magentoConfigFixture default_store payment/mollie_general/enabled 1
+     * @magentoConfigFixture default_store payment/mollie_general/mode test
+     * @magentoConfigFixture default_store payment/mollie_general/apikey_test test_dummyapikeywhichmustbe30characterslong
      * @throws \Magento\Framework\Exception\LocalizedException
      * @throws \Magento\Framework\Exception\NoSuchEntityException
      */
-    public function testIsAvailableWhenTheCategoryIsSet()
+    public function testIsAvailableWhenTheCategoryIsSet(): void
     {
         /** @var CartInterface $cart */
         $cart = $this->objectManager->create(CartInterface::class);
+
+        // When only running this test this isn't required, but when running this test in combination with other test
+        // this test will fail without this line.
+        $this->objectManager->addSharedInstance($this->objectManager->create(General::class), General::class);
 
         /** @var Voucher $instance */
         $instance = $this->objectManager->create(Voucher::class);

@@ -7,16 +7,18 @@
 namespace Mollie\Payment;
 
 use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\App\ProductMetadataInterface;
 use Magento\Framework\Module\Manager;
-use Magento\Payment\Model\MethodInterface;
 use Magento\Store\Model\ScopeInterface;
 use Mollie\Payment\Logger\MollieLogger;
 use Mollie\Payment\Model\Adminhtml\Source\VoucherCategory;
-use phpDocumentor\Reflection\Types\Static_;
 
 class Config
 {
     const EXTENSION_CODE = 'Mollie_Payment';
+    const ADVANCED_INVOICE_MOMENT = 'payment/mollie_general/invoice_moment';
+    const ADVANCED_ENABLE_MANUAL_CAPTURE = 'payment/mollie_general/enable_manual_capture';
+    const GENERAL_ENABLED = 'payment/mollie_general/enabled';
     const GENERAL_APIKEY_LIVE = 'payment/mollie_general/apikey_live';
     const GENERAL_APIKEY_TEST = 'payment/mollie_general/apikey_test';
     const GENERAL_AUTOMATICALLY_SEND_SECOND_CHANCE_EMAILS = 'payment/mollie_general/automatically_send_second_chance_emails';
@@ -27,14 +29,20 @@ class Config
     const GENERAL_DEFAULT_SELECTED_METHOD = 'payment/mollie_general/default_selected_method';
     const GENERAL_DASHBOARD_URL_ORDERS_API = 'payment/mollie_general/dashboard_url_orders_api';
     const GENERAL_DASHBOARD_URL_PAYMENTS_API = 'payment/mollie_general/dashboard_url_payments_api';
+    const GENERAL_ENABLE_MAGENTO_VAULT = 'payment/mollie_general/enable_magento_vault';
     const GENERAL_ENABLE_SECOND_CHANCE_EMAIL = 'payment/mollie_general/enable_second_chance_email';
+    const GENERAL_ENCRYPT_PAYMENT_DETAILS = 'payment/mollie_general/encrypt_payment_details';
     const GENERAL_INCLUDE_SHIPPING_IN_SURCHARGE = 'payment/mollie_general/include_shipping_in_surcharge';
     const GENERAL_INVOICE_NOTIFY = 'payment/mollie_general/invoice_notify';
+    const GENERAL_INVOICE_NOTIFY_KLARNA = 'payment/mollie_general/invoice_notify_klarna';
     const GENERAL_LOCALE = 'payment/mollie_general/locale';
     const GENERAL_ORDER_STATUS_PENDING = 'payment/mollie_general/order_status_pending';
     const GENERAL_PROFILEID = 'payment/mollie_general/profileid';
+    const GENERAL_REDIRECT_WHEN_TRANSACTION_FAILS_TO = 'payment/mollie_general/redirect_when_transaction_fails_to';
     const GENERAL_SECOND_CHANCE_EMAIL_TEMPLATE = 'payment/mollie_general/second_chance_email_template';
     const GENERAL_SECOND_CHANCE_DELAY = 'payment/mollie_general/second_chance_email_delay';
+    const GENERAL_SECOND_CHANCE_SEND_BCC_TO = 'payment/mollie_general/second_chance_send_bcc_to';
+    const GENERAL_SECOND_CHANCE_USE_PAYMENT_METHOD = 'payment/mollie_general/second_chance_use_payment_method';
     const GENERAL_TYPE = 'payment/mollie_general/type';
     const GENERAL_USE_BASE_CURRENCY = 'payment/mollie_general/currency';
     const GENERAL_USE_CUSTOM_REDIRECT_URL = 'payment/mollie_general/use_custom_redirect_url';
@@ -44,11 +52,14 @@ class Config
     const PAYMENT_APPLEPAY_BUY_NOW_BUTTON_COLOR = 'payment/mollie_methods_applepay/buy_now_button_color';
     const PAYMENT_APPLEPAY_BUY_NOW_BUTTON_TEXT = 'payment/mollie_methods_applepay/buy_now_button_text';
     const PAYMENT_APPLEPAY_INTEGRATION_TYPE = 'payment/mollie_methods_applepay/integration_type';
+    const PAYMENT_APPLEPAY_ENABLE_MINICART_BUTTON = 'payment/mollie_methods_applepay/enable_minicart_button';
+    const PAYMENT_APPLEPAY_MINICART_BUTTON_COLOR = 'payment/mollie_methods_applepay/minicart_button_color';
+    const PAYMENT_APPLEPAY_MINICART_BUTTON_TEXT = 'payment/mollie_methods_applepay/minicart_button_text';
     const PAYMENT_CREDITCARD_USE_COMPONENTS = 'payment/mollie_methods_creditcard/use_components';
     const PAYMENT_CREDITCARD_ENABLE_CUSTOMERS_API = 'payment/mollie_methods_creditcard/enable_customers_api';
     const PAYMENT_BANKTRANSFER_STATUS_PENDING = 'payment/mollie_methods_banktransfer/order_status_pending';
     const PAYMENT_METHOD_PAYMENT_ACTIVE = 'payment/mollie_methods_%s/active';
-    const PAYMENT_METHOD_PAYMENT_DESCRIPTION = 'payment/mollie_methods_%s/description';
+    const PAYMENT_METHOD_PAYMENT_DESCRIPTION = 'payment/mollie_methods_%s/payment_description';
     const PAYMENT_METHOD_PAYMENT_SURCHARGE_FIXED_AMOUNT = 'payment/mollie_methods_%s/payment_surcharge_fixed_amount';
     const PAYMENT_METHOD_PAYMENT_SURCHARGE_LIMIT = 'payment/mollie_methods_%s/payment_surcharge_limit';
     const PAYMENT_METHOD_PAYMENT_SURCHARGE_PERCENTAGE = 'payment/mollie_methods_%s/payment_surcharge_percentage';
@@ -59,6 +70,7 @@ class Config
     const PAYMENT_PAYMENTLINK_NEW_STATUS = 'payment/mollie_methods_paymentlink/order_status_new';
     const PAYMENT_VOUCHER_CATEGORY = 'payment/mollie_methods_voucher/category';
     const PAYMENT_VOUCHER_CUSTOM_ATTRIBUTE = 'payment/mollie_methods_voucher/custom_attribute';
+    const CURRENCY_OPTIONS_DEFAULT = 'currency/options/default';
 
     /**
      * @var ScopeConfigInterface
@@ -75,14 +87,21 @@ class Config
      */
     private $moduleManager;
 
+    /**
+     * @var ProductMetadataInterface
+     */
+    private $productMetadata;
+
     public function __construct(
         ScopeConfigInterface $config,
         MollieLogger $logger,
-        Manager $moduleManager
+        Manager $moduleManager,
+        ProductMetadataInterface $productMetadata
     ) {
         $this->config = $config;
         $this->logger = $logger;
         $this->moduleManager = $moduleManager;
+        $this->productMetadata = $productMetadata;
     }
 
     /**
@@ -102,7 +121,7 @@ class Config
      * @param string $scope
      * @return bool
      */
-    private function isSetFlag($path, $storeId, $scope = ScopeInterface::SCOPE_STORE)
+    private function isSetFlag($path, $storeId, string $scope = ScopeInterface::SCOPE_STORE): bool
     {
         return $this->config->isSetFlag($path, $scope, $storeId);
     }
@@ -134,6 +153,41 @@ class Config
     }
 
     /**
+     * Returns current version of Magento
+     *
+     * @return string
+     */
+    public function getMagentoVersion(): string
+    {
+        return $this->productMetadata->getVersion();
+    }
+
+    /**
+     * @return string
+     */
+    public function getMagentoEdition(): string
+    {
+        return $this->productMetadata->getEdition();
+    }
+
+    /**
+     * @param null|int|string $storeId
+     * @return string
+     */
+    public function getStoreCurrency($storeId = null): ?string
+    {
+        return $this->getPath(static::CURRENCY_OPTIONS_DEFAULT, null);
+    }
+
+    /**
+     * @return bool
+     */
+    public function isModuleEnabled($storeId = null): bool
+    {
+        return $this->isSetFlag(static::GENERAL_ENABLED, $storeId);
+    }
+
+    /**
      * Returns API key
      *
      * @param null|int|string $storeId
@@ -148,10 +202,11 @@ class Config
         }
 
         if (!$this->isProductionMode($storeId)) {
-            $apiKey = trim($this->getPath(static::GENERAL_APIKEY_TEST, $storeId));
+            $apiKey = trim($this->getPath(static::GENERAL_APIKEY_TEST, $storeId) ?? '');
             if (empty($apiKey)) {
                 $this->addToLog('error', 'Mollie API key not set (test modus)');
             }
+
             if (!preg_match('/^test_\w+$/', $apiKey)) {
                 $this->addToLog('error', 'Mollie set to test modus, but API key does not start with "test_"');
             }
@@ -160,7 +215,7 @@ class Config
             return $apiKey;
         }
 
-        $apiKey = trim($this->getPath(static::GENERAL_APIKEY_LIVE, $storeId));
+        $apiKey = trim($this->getPath(static::GENERAL_APIKEY_LIVE, $storeId) ?? '');
         if (empty($apiKey)) {
             $this->addToLog('error', 'Mollie API key not set (live modus)');
         }
@@ -184,11 +239,38 @@ class Config
 
     /**
      * @param null|int|string $storeId
+     * @return string|null
+     */
+    public function getInvoiceMoment($storeId = null): ?string
+    {
+        return $this->getPath(static::ADVANCED_INVOICE_MOMENT, $storeId);
+    }
+
+    /**
+     * @param null|int|string $storeId
+     * @return bool
+     */
+    public function useManualCapture($storeId): bool
+    {
+        return $this->isSetFlag(static::ADVANCED_ENABLE_MANUAL_CAPTURE, $storeId);
+    }
+
+    /**
+     * @param null|int|string $storeId
      * @return bool
      */
     public function sendInvoiceEmail($storeId = null)
     {
         return $this->isSetFlag(static::GENERAL_INVOICE_NOTIFY, $storeId);
+    }
+
+    /**
+     * @param null|int|string $storeId
+     * @return bool
+     */
+    public function sendInvoiceEmailForKlarna($storeId = null)
+    {
+        return $this->isSetFlag(static::GENERAL_INVOICE_NOTIFY_KLARNA, $storeId);
     }
 
     /**
@@ -247,6 +329,24 @@ class Config
     public function secondChanceEmailDelay($storeId = null)
     {
         return $this->getPath(static::GENERAL_SECOND_CHANCE_DELAY, $storeId);
+    }
+
+    /**
+     * @param null|int|string $storeId
+     * @return string|null
+     */
+    public function secondChanceSendBccTo(int $storeId = null): ?string
+    {
+        return $this->getPath(static::GENERAL_SECOND_CHANCE_SEND_BCC_TO, $storeId);
+    }
+
+    /**
+     * @param null|int|string $storeId
+     * @return string|null
+     */
+    public function secondChanceUsePaymentMethod(int $storeId = null): ?string
+    {
+        return $this->getPath(static::GENERAL_SECOND_CHANCE_USE_PAYMENT_METHOD, $storeId);
     }
 
     /**
@@ -316,6 +416,33 @@ class Config
      * @param null|int|string $storeId
      * @return bool
      */
+    public function applePayEnableMinicartButton($storeId = null)
+    {
+        return $this->isSetFlag(static::PAYMENT_APPLEPAY_ENABLE_MINICART_BUTTON, $storeId);
+    }
+
+    /**
+     * @param null|int|string $storeId
+     * @return bool
+     */
+    public function applePayMinicartColor($storeId = null)
+    {
+        return $this->getPath(static::PAYMENT_APPLEPAY_MINICART_BUTTON_COLOR, $storeId);
+    }
+
+    /**
+     * @param null|int|string $storeId
+     * @return bool
+     */
+    public function applePayMinicartText($storeId = null)
+    {
+        return $this->getPath(static::PAYMENT_APPLEPAY_MINICART_BUTTON_TEXT, $storeId);
+    }
+
+    /**
+     * @param null|int|string $storeId
+     * @return bool
+     */
     public function applePayIntegrationType($storeId = null)
     {
         return $this->getPath(static::PAYMENT_APPLEPAY_INTEGRATION_TYPE, $storeId);
@@ -370,7 +497,7 @@ class Config
      * @param int|null $storeId
      * @return bool
      */
-    public function isMethodActive($method, $storeId = null): bool
+    public function isMethodActive(string $method, int $storeId = null): bool
     {
         return $this->isSetFlag($this->addMethodToPath(static::PAYMENT_METHOD_PAYMENT_ACTIVE, $method), $storeId);
     }
@@ -535,9 +662,15 @@ class Config
      * @param null|int|string $storeId
      * @return string
      */
-    public function customWebhookUrl($storeId = null)
+    public function customWebhookUrl($storeId = null): string
     {
-        return $this->getPath(static::GENERAL_CUSTOM_WEBHOOK_URL, $storeId);
+        $value = $this->getPath(static::GENERAL_CUSTOM_WEBHOOK_URL, $storeId);
+
+        if (!$value) {
+            return '';
+        }
+
+        return $value;
     }
 
     /**
@@ -550,6 +683,11 @@ class Config
         return $this->getPath(static::GENERAL_CUSTOM_REDIRECT_URL, $storeId, $scope);
     }
 
+    public function redirectWhenTransactionFailsTo($storeId = null, $scope = ScopeInterface::SCOPE_STORE): ?string
+    {
+        return $this->getPath(static::GENERAL_REDIRECT_WHEN_TRANSACTION_FAILS_TO, $storeId, $scope);
+    }
+
     /**
      * @see \Mollie\Payment\Model\Adminhtml\Source\Locale for possible values
      * @param null|int|string $storeId
@@ -560,9 +698,22 @@ class Config
         return $this->getPath(static::GENERAL_LOCALE, $storeId);
     }
 
+    /**
+     * @param null|int|string $storeId
+     */
+    public function isMagentoVaultEnabled($storeId = null): bool
+    {
+        return $this->isSetFlag(static::GENERAL_ENABLE_MAGENTO_VAULT, $storeId);
+    }
+
     public function isMultishippingEnabled(): bool
     {
         return $this->moduleManager->isEnabled('Mollie_Multishipping');
+    }
+
+    public function encryptPaymentDetails($storeId = null): bool
+    {
+        return $this->isSetFlag(static::GENERAL_ENCRYPT_PAYMENT_DETAILS, $storeId);
     }
 
     /**
@@ -573,7 +724,7 @@ class Config
     {
         return sprintf(
             $path,
-            str_replace('mollie_methods_', '', $method)
+            str_replace('mollie_methods_', '', $method ?? '')
         );
     }
 }

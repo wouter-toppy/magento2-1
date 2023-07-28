@@ -1,6 +1,8 @@
 define(
     [
         'jquery',
+        'underscore',
+        'ko',
         'mage/url',
         'mage/storage',
         'Magento_Checkout/js/view/payment/default',
@@ -8,10 +10,13 @@ define(
         'Magento_Checkout/js/checkout-data',
         'Magento_Customer/js/model/customer',
         'Magento_Checkout/js/model/url-builder',
-        'Mollie_Payment/js/model/checkout-config'
+        'Mollie_Payment/js/model/checkout-config',
+        'jquery/jquery-storageapi'
     ],
     function (
         $,
+        _,
+        ko,
         url,
         storage,
         Component,
@@ -30,6 +35,23 @@ define(
                 redirectAfterPlaceOrder: false,
                 defaults: {
                     template: 'Mollie_Payment/payment/default'
+                },
+                initialize: function () {
+                    this._super();
+
+                    this.isChecked.subscribe( function () {
+                        if (this.getCode() !== this.isChecked()) {
+                            return;
+                        }
+
+                        this.renderMessages();
+                    }.bind(this));
+
+                    if (this.getCode() === this.isChecked()) {
+                        this.renderMessages();
+                    }
+
+                    return this;
                 },
                 initObservable: function () {
                     this._super().observe([
@@ -74,7 +96,7 @@ define(
 
                     var promise = storage.get(serviceUrl);
 
-                    promise.success( function (result) {
+                    promise.done( function (result) {
                         this.paymentToken(result);
                     }.bind(this));
 
@@ -83,6 +105,71 @@ define(
                 afterPlaceOrder: function () {
                     this._super();
                     window.location = url.build('mollie/checkout/redirect/paymentToken/' + this.paymentToken());
+                },
+                renderMessages: function () {
+                    // Copied from Magento_Theme/js/view/messages
+                    var messages = _.unique($.cookieStorage.get('mage-messages'), 'text');
+
+                    $.each(messages, function (index, row) {
+                        if (row.type === 'success') {
+                            this.messageContainer.addSuccessMessage({message: row.text});
+                        } else {
+                            this.messageContainer.addErrorMessage({message: row.text});
+                        }
+                    }.bind(this));
+
+                    // Copied from Magento_Theme/js/view/messages
+                    $.mage.cookies.set('mage-messages', '', {
+                        samesite: 'strict',
+                        domain: ''
+                    });
+
+                    if (!messages.length) {
+                        return;
+                    }
+
+                    // Make sure the messages are visible
+                    var attempts = 0;
+                    var interval = setInterval(function () {
+                        attempts++;
+
+                        if (attempts > 10) {
+                            clearInterval(interval);
+                            return;
+                        }
+
+                        var element = $('.payment-method._active [data-role="checkout-messages"]');
+                        if (!element.length) {
+                            return;
+                        }
+
+                        clearInterval(interval);
+                        if (!this.isInViewport(element.get(0))) {
+                            $([document.documentElement, document.body]).animate({
+                                scrollTop: element.offset().top - 100
+                            }, 500);
+                        }
+                    }.bind(this), 100);
+                },
+                isInViewport: function (element) {
+                    var bounding = element.getBoundingClientRect();
+
+                    return (
+                        bounding.top >= 0 &&
+                        bounding.left >= 0 &&
+                        bounding.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+                        bounding.right <= (window.innerWidth || document.documentElement.clientWidth)
+                    );
+                },
+                getClassNames: function () {
+                    return ko.computed( function () {
+                        var output = 'payment-method-' + this.getCode();
+                        if (this.getCode() === this.isChecked()) {
+                            output += ' _active';
+                        }
+
+                        return output;
+                    }.bind(this));
                 }
             }
         );

@@ -12,22 +12,29 @@ use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Model\AbstractModel;
 use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Model\Order;
-use Magento\Sales\Model\Order\Email\Sender\InvoiceSender;
-use Magento\Sales\Model\Order\Email\Sender\OrderSender;
+use Magento\Sales\Model\Order\Invoice;
 use Magento\Sales\Model\OrderRepository;
 use Mollie\Api\MollieApiClient;
 use Mollie\Api\Resources\Payment as MolliePayment;
 use Mollie\Api\Types\PaymentStatus;
-use Mollie\Payment\Config;
 use Mollie\Payment\Helper\General as MollieHelper;
+use Mollie\Payment\Model\Adminhtml\Source\InvoiceMoment;
+use Mollie\Payment\Model\Client\Payments\ProcessTransaction;
 use Mollie\Payment\Service\Mollie\DashboardUrl;
+use Mollie\Payment\Service\Mollie\Order\CanRegisterCaptureNotification;
+use Mollie\Payment\Service\Mollie\Order\LinkTransactionToOrder;
 use Mollie\Payment\Service\Mollie\TransactionDescription;
+use Mollie\Payment\Service\Mollie\ValidateMetadata;
 use Mollie\Payment\Service\Order\BuildTransaction;
 use Mollie\Payment\Service\Order\OrderAmount;
 use Mollie\Payment\Service\Order\CancelOrder;
 use Mollie\Payment\Service\Order\OrderCommentHistory;
+use Mollie\Payment\Service\Order\ExpiredOrderToTransaction;
+use Mollie\Payment\Service\Order\SaveAdditionalInformationDetails;
+use Mollie\Payment\Service\Order\SendOrderEmails;
 use Mollie\Payment\Service\Order\Transaction;
 use Mollie\Payment\Service\Order\TransactionProcessor;
+use Mollie\Payment\Service\PaymentToken\PaymentTokenForOrder;
 
 /**
  * Class Payments
@@ -36,8 +43,9 @@ use Mollie\Payment\Service\Order\TransactionProcessor;
  */
 class Payments extends AbstractModel
 {
-
     const CHECKOUT_TYPE = 'payment';
+    const TRANSACTION_TYPE_WEBHOOK = 'webhook';
+    const TRANSACTION_TYPE_SUBSCRIPTION = 'subscription';
 
     /**
      * @var MollieHelper
@@ -47,14 +55,6 @@ class Payments extends AbstractModel
      * @var OrderRepository
      */
     private $orderRepository;
-    /**
-     * @var OrderSender
-     */
-    private $orderSender;
-    /**
-     * @var InvoiceSender
-     */
-    private $invoiceSender;
     /**
      * @var CheckoutSession
      */
@@ -67,10 +67,6 @@ class Payments extends AbstractModel
      * @var BuildTransaction
      */
     private $buildTransaction;
-    /**
-     * @var Config
-     */
-    private $config;
     /**
      * @var DashboardUrl
      */
@@ -105,49 +101,96 @@ class Payments extends AbstractModel
     private $cancelOrder;
 
     /**
+     * @var PaymentTokenForOrder
+     */
+    private $paymentTokenForOrder;
+
+    /**
+     * @var SendOrderEmails
+     */
+    private $sendOrderEmails;
+
+    /**
+     * @var LinkTransactionToOrder
+     */
+    private $linkTransactionToOrder;
+
+    /**
+     * @var Payments\ProcessTransaction
+     */
+    private $processTransaction;
+
+    /**
+     * @var ValidateMetadata
+     */
+    private $validateMetadata;
+
+    /**
+     * @var SaveAdditionalInformationDetails
+     */
+    private $saveAdditionalInformationDetails;
+
+    /**
+     * @var ExpiredOrderToTransaction
+     */
+    private $expiredOrderToTransaction;
+
+    /**
+     * @var CanRegisterCaptureNotification
+     */
+    private $canRegisterCaptureNotification;
+
+    /**
      * Payments constructor.
      *
-     * @param OrderSender $orderSender
-     * @param InvoiceSender $invoiceSender
      * @param OrderRepository $orderRepository
      * @param CheckoutSession $checkoutSession
      * @param MollieHelper $mollieHelper
      * @param OrderCommentHistory $orderCommentHistory
      * @param BuildTransaction $buildTransaction
-     * @param Config $config
      * @param DashboardUrl $dashboardUrl
      * @param Transaction $transaction
      * @param TransactionProcessor $transactionProcessor
-     * @param CancelOrder $cancelOrder
-     * @param EventManager $eventManager
      * @param OrderAmount $orderAmount
      * @param TransactionDescription $transactionDescription
+     * @param CancelOrder $cancelOrder
+     * @param PaymentTokenForOrder $paymentTokenForOrder
+     * @param SendOrderEmails $sendOrderEmails
+     * @param EventManager $eventManager
+     * @param LinkTransactionToOrder $linkTransactionToOrder
+     * @param ProcessTransaction $processTransaction
+     * @param ValidateMetadata $validateMetadata
+     * @param SaveAdditionalInformationDetails $saveAdditionalInformationDetails
+     * @param ExpiredOrderToTransaction $expiredOrderToTransaction
+     * @param CanRegisterCaptureNotification $canRegisterCaptureNotification
      */
     public function __construct(
-        OrderSender $orderSender,
-        InvoiceSender $invoiceSender,
         OrderRepository $orderRepository,
         CheckoutSession $checkoutSession,
         MollieHelper $mollieHelper,
         OrderCommentHistory $orderCommentHistory,
         BuildTransaction $buildTransaction,
-        Config $config,
         DashboardUrl $dashboardUrl,
         Transaction $transaction,
         TransactionProcessor $transactionProcessor,
         OrderAmount $orderAmount,
         TransactionDescription $transactionDescription,
         CancelOrder $cancelOrder,
-        EventManager $eventManager
+        PaymentTokenForOrder $paymentTokenForOrder,
+        SendOrderEmails $sendOrderEmails,
+        EventManager $eventManager,
+        LinkTransactionToOrder $linkTransactionToOrder,
+        ProcessTransaction $processTransaction,
+        ValidateMetadata $validateMetadata,
+        SaveAdditionalInformationDetails $saveAdditionalInformationDetails,
+        ExpiredOrderToTransaction $expiredOrderToTransaction,
+        CanRegisterCaptureNotification $canRegisterCaptureNotification
     ) {
-        $this->orderSender = $orderSender;
-        $this->invoiceSender = $invoiceSender;
         $this->orderRepository = $orderRepository;
         $this->checkoutSession = $checkoutSession;
         $this->mollieHelper = $mollieHelper;
         $this->orderCommentHistory = $orderCommentHistory;
         $this->buildTransaction = $buildTransaction;
-        $this->config = $config;
         $this->dashboardUrl = $dashboardUrl;
         $this->transaction = $transaction;
         $this->transactionProcessor = $transactionProcessor;
@@ -155,6 +198,14 @@ class Payments extends AbstractModel
         $this->orderAmount = $orderAmount;
         $this->transactionDescription = $transactionDescription;
         $this->cancelOrder = $cancelOrder;
+        $this->paymentTokenForOrder = $paymentTokenForOrder;
+        $this->sendOrderEmails = $sendOrderEmails;
+        $this->linkTransactionToOrder = $linkTransactionToOrder;
+        $this->processTransaction = $processTransaction;
+        $this->validateMetadata = $validateMetadata;
+        $this->saveAdditionalInformationDetails = $saveAdditionalInformationDetails;
+        $this->expiredOrderToTransaction = $expiredOrderToTransaction;
+        $this->canRegisterCaptureNotification = $canRegisterCaptureNotification;
     }
 
     /**
@@ -175,18 +226,14 @@ class Payments extends AbstractModel
             return $payment->getCheckoutUrl();
         }
 
-        $paymentToken = $this->mollieHelper->getPaymentToken();
+        $paymentToken = $this->paymentTokenForOrder->execute($order);
         $method = $this->mollieHelper->getMethodCode($order);
         $paymentData = [
             'amount'         => $this->mollieHelper->getOrderAmountByOrder($order),
-            'description'    => $this->transactionDescription->forRegularTransaction(
-                $method,
-                $order->getIncrementId(),
-                $storeId
-            ),
+            'description'    => $this->transactionDescription->forRegularTransaction($order),
             'billingAddress' => $this->getAddressLine($order->getBillingAddress()),
             'redirectUrl'    => $this->transaction->getRedirectUrl($order, $paymentToken),
-            'webhookUrl'     => $this->transaction->getWebhookUrl($storeId),
+            'webhookUrl'     => $this->transaction->getWebhookUrl([$order]),
             'method'         => $method,
             'metadata'       => [
                 'order_id'      => $orderId,
@@ -215,6 +262,11 @@ class Payments extends AbstractModel
         $this->mollieHelper->addTolog('request', $paymentData);
         $payment = $mollieApi->payments->create($paymentData);
         $this->processResponse($order, $payment);
+
+        // Order is paid immediately (eg. Credit Card with Components, Apple Pay), process transaction
+        if ($payment->isPaid()) {
+            $this->processTransaction->execute($order, static::TRANSACTION_TYPE_WEBHOOK);
+        }
 
         return $payment->getCheckoutUrl();
     }
@@ -259,8 +311,9 @@ class Payments extends AbstractModel
 
         $status = $this->mollieHelper->getPendingPaymentStatus($order);
 
+        $order->setState(Order::STATE_PENDING_PAYMENT);
         $order->addStatusToHistory($status, __('Customer redirected to Mollie'), false);
-        $order->setMollieTransactionId($payment->id);
+        $this->linkTransactionToOrder->execute($payment->id, $order);
         $this->orderRepository->save($order);
     }
 
@@ -280,6 +333,9 @@ class Payments extends AbstractModel
         $storeId = $order->getStoreId();
         $transactionId = $order->getMollieTransactionId();
         $paymentData = $mollieApi->payments->get($transactionId);
+
+        $this->validateMetadata->execute($paymentData->metadata, $order);
+
         $this->mollieHelper->addTolog($type, $paymentData);
         $dashboardUrl = $this->dashboardUrl->forPaymentsApi($order->getStoreId(), $paymentData->id);
         $order->getPayment()->setAdditionalInformation('dashboard_url', $dashboardUrl);
@@ -287,14 +343,16 @@ class Payments extends AbstractModel
 
         $status = $paymentData->status;
         $payment = $order->getPayment();
-        if ($type == 'webhook' && $payment->getAdditionalInformation('payment_status') != $status) {
+        if (in_array($type, [static::TRANSACTION_TYPE_WEBHOOK, static::TRANSACTION_TYPE_SUBSCRIPTION]) &&
+            $payment->getAdditionalInformation('payment_status') != $status
+        ) {
             $payment->setAdditionalInformation('payment_status', $status);
             $this->orderRepository->save($order);
         }
 
         $refunded = isset($paymentData->_links->refunds) ? true : false;
 
-        if ($status == 'paid' && !$refunded) {
+        if (in_array($status, ['paid', 'authorized']) && !$refunded) {
             $amount = $paymentData->amount->value;
             $currency = $paymentData->amount->currency;
             $orderAmount = $this->orderAmount->getByTransactionId($transactionId);
@@ -304,19 +362,29 @@ class Payments extends AbstractModel
                 return $msg;
             }
             if ($paymentData->details !== null) {
-                $payment->setAdditionalInformation('details', json_encode($paymentData->details));
+                $this->saveAdditionalInformationDetails->execute($payment, $paymentData->details);
             }
 
-            if (!$payment->getIsTransactionClosed() && $type == 'webhook') {
+            if (!$payment->getIsTransactionClosed() &&
+                in_array($type, [static::TRANSACTION_TYPE_WEBHOOK, static::TRANSACTION_TYPE_SUBSCRIPTION])
+            ) {
                 if ($order->isCanceled()) {
                     $order = $this->mollieHelper->uncancelOrder($order);
                 }
 
-                if (abs($amount - $orderAmount['value']) < 0.01) {
+                if (abs($amount - $orderAmount['value']) < 0.01 ||
+                    $type == static::TRANSACTION_TYPE_SUBSCRIPTION
+                ) {
                     $payment->setTransactionId($transactionId);
                     $payment->setCurrencyCode($order->getBaseCurrencyCode());
                     $payment->setIsTransactionClosed(true);
-                    $payment->registerCaptureNotification($order->getBaseGrandTotal(), true);
+
+                    if ($this->canRegisterCaptureNotification->execute($order) ||
+                        $type != static::TRANSACTION_TYPE_WEBHOOK
+                    ) {
+                        $payment->registerCaptureNotification($order->getBaseGrandTotal(), true);
+                    }
+
                     $order->setState(Order::STATE_PROCESSING);
                     $this->transactionProcessor->process($order, null, $paymentData);
 
@@ -346,25 +414,11 @@ class Payments extends AbstractModel
                 $sendInvoice = $this->mollieHelper->sendInvoice($storeId);
 
                 if (!$order->getEmailSent()) {
-                    try {
-                        $this->orderSender->send($order);
-                        $message = __('New order email sent');
-                        $this->orderCommentHistory->add($order, $message, true);
-                    } catch (\Throwable $exception) {
-                        $message = __('Unable to send the new order email: %1', $exception->getMessage());
-                        $this->orderCommentHistory->add($order, $message, false);
-                    }
+                    $this->sendOrderEmails->sendOrderConfirmation($order);
                 }
 
                 if ($invoice && !$invoice->getEmailSent() && $sendInvoice) {
-                    try {
-                        $this->invoiceSender->send($invoice);
-                        $message = __('Notified customer about invoice #%1', $invoice->getIncrementId());
-                        $this->orderCommentHistory->add($order, $message, true);
-                    } catch (\Throwable $exception) {
-                        $message = __('Unable to send the invoice: %1', $exception->getMessage());
-                        $this->orderCommentHistory->add($order, $message, true);
-                    }
+                    $this->sendOrderEmails->sendInvoiceEmail($invoice);
                 }
             }
 
@@ -380,19 +434,15 @@ class Payments extends AbstractModel
         }
         if ($status == 'open') {
             if ($paymentData->method == 'banktransfer' && !$order->getEmailSent()) {
-                try {
-                    $this->orderSender->send($order);
-                    $message = __('New order email sent');
-                } catch (\Throwable $exception) {
-                    $message = __('Unable to send the new order email: %1', $exception->getMessage());
-                }
-
                 if (!$statusPending = $this->mollieHelper->getStatusPendingBanktransfer($storeId)) {
                     $statusPending = $order->getStatus();
                 }
+
+                $order->setStatus($statusPending);
                 $order->setState(Order::STATE_PENDING_PAYMENT);
+                $this->sendOrderEmails->sendOrderConfirmation($order);
+
                 $this->transactionProcessor->process($order, null, $paymentData);
-                $order->addStatusToHistory($statusPending, $message, true);
                 $this->orderRepository->save($order);
             }
             $msg = ['success' => true, 'status' => 'open', 'order_id' => $orderId, 'type' => $type];
@@ -405,8 +455,16 @@ class Payments extends AbstractModel
             $this->mollieHelper->addTolog('success', $msg);
             return $msg;
         }
+        if ($status == 'expired') {
+            if ($this->expiredOrderToTransaction->hasMultipleTransactions($order)) {
+                $this->expiredOrderToTransaction->markTransactionAsSkipped($transactionId);
+                $msg = ['success' => false, 'status' => $status, 'order_id' => $orderId, 'type' => $type];
+                $this->mollieHelper->addTolog('success', $msg);
+                return $msg;
+            }
+        }
         if ($status == 'canceled' || $status == 'failed' || $status == 'expired') {
-            if ($type == 'webhook') {
+            if (in_array($type, [static::TRANSACTION_TYPE_WEBHOOK, static::TRANSACTION_TYPE_SUBSCRIPTION])) {
                 $this->cancelOrder->execute($order, $status);
                 $this->transactionProcessor->process($order, null, $paymentData);
             }
@@ -448,9 +506,10 @@ class Payments extends AbstractModel
      */
     public function checkCheckoutSession(Order $order, $paymentToken, $paymentData, $type)
     {
-        if ($type == 'webhook') {
+        if (in_array($type, [static::TRANSACTION_TYPE_WEBHOOK, static::TRANSACTION_TYPE_SUBSCRIPTION])) {
             return;
         }
+
         if ($this->checkoutSession->getLastOrderId() != $order->getId()) {
             if ($paymentToken && isset($paymentData->metadata->payment_token)) {
                 if ($paymentToken == $paymentData->metadata->payment_token) {

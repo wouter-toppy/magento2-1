@@ -10,6 +10,7 @@ use Magento\Framework\App\ObjectManager;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\DB\Adapter\AdapterInterface;
 use Magento\Framework\Lock\LockManagerInterface;
+use Mollie\Payment\Config;
 
 /**
  * This class is meant as an alternative implantation of:
@@ -22,6 +23,11 @@ use Magento\Framework\Lock\LockManagerInterface;
  */
 class LockService
 {
+    /**
+     * @var Config
+     */
+    private $config;
+
     /**
      * @var LockManagerInterface
      */
@@ -37,9 +43,16 @@ class LockService
      */
     private $resourceConnection;
 
+    /**
+     * @var bool
+     */
+    private $alreadyLocked = false;
+
     public function __construct(
+        Config $config,
         ResourceConnection $resourceConnection
     ) {
+        $this->config = $config;
         $this->resourceConnection = $resourceConnection;
     }
 
@@ -52,14 +65,24 @@ class LockService
      */
     public function lock(string $name, int $timeout = -1): bool
     {
+        // Make sure we only lock once per request.
+        if ($this->alreadyLocked) {
+            return true;
+        }
+
+        $this->config->addToLog('info', 'Locking: ' . $name);
         if ($this->isLockManagerAvailable()) {
-            return $this->lockManager->lock($name, $timeout);
+            return $this->alreadyLocked = $this->lockManager->lock($name, $timeout);
         }
 
         $result = (bool)$this->getConnection()->query(
             "SELECT GET_LOCK(?, ?);",
             [$name, $timeout < 0 ? 60 * 60 * 24 * 7 : $timeout]
         )->fetchColumn();
+
+        if ($result) {
+            $this->alreadyLocked = true;
+        }
 
         return $result;
     }
@@ -72,14 +95,21 @@ class LockService
      */
     public function unlock(string $name): bool
     {
+        $this->config->addToLog('info', 'Unlocking: ' . $name);
         if ($this->isLockManagerAvailable()) {
-            return $this->lockManager->unlock($name);
+            $result = $this->lockManager->unlock($name);
+            $this->alreadyLocked = !$result;
+            return $result;
         }
 
         $result = (bool)$this->getConnection()->query(
             "SELECT RELEASE_LOCK(?);",
             [(string)$name]
         )->fetchColumn();
+
+        if ($result) {
+            $this->alreadyLocked = false;
+        }
 
         return $result;
     }
@@ -100,6 +130,39 @@ class LockService
             "SELECT IS_USED_LOCK(?);",
             [$name]
         )->fetchColumn();
+    }
+
+    /**
+     * Try to get a lock, and if not, try $attempts times to get it.
+     *
+     * @param string $name
+     * @return bool
+     */
+    public function checkIfIsLockedWithWait(string $name, int $attempts = 5): bool
+    {
+        $count = 0;
+        $waitTime = 0;
+        while ($this->isLocked($name)) {
+            $waitTime += 500000;
+            $this->config->addToLog(
+                'info',
+                sprintf(
+                    'Lock for "%s" is already active, attempt %d (sleep for: %01.1F)',
+                    $name,
+                    $count,
+                    $waitTime / 1000000
+                )
+            );
+
+            usleep($waitTime);
+            $count++;
+
+            if ($count > $attempts) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function isLockManagerAvailable(): bool

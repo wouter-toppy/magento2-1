@@ -33,25 +33,29 @@ class MollieConfigProvider implements ConfigProviderInterface
      * @var array
      */
     private $methodCodes = [
+        'mollie_methods_applepay',
         'mollie_methods_bancontact',
         'mollie_methods_banktransfer',
         'mollie_methods_belfius',
+        'mollie_methods_billie',
         'mollie_methods_creditcard',
         'mollie_methods_directdebit',
+        'mollie_methods_eps',
+        'mollie_methods_giftcard',
+        'mollie_methods_giropay',
         'mollie_methods_ideal',
+        'mollie_methods_in3',
         'mollie_methods_kbc',
-        'mollie_methods_voucher',
+        'mollie_methods_klarna',
+        'mollie_methods_klarnapaylater',
+        'mollie_methods_klarnapaynow',
+        'mollie_methods_klarnasliceit',
+        'mollie_methods_mybank',
         'mollie_methods_paypal',
         'mollie_methods_paysafecard',
-        'mollie_methods_sofort',
-        'mollie_methods_giropay',
-        'mollie_methods_eps',
-        'mollie_methods_klarnapaylater',
-        'mollie_methods_klarnasliceit',
-        'mollie_methods_giftcard',
         'mollie_methods_przelewy24',
-        'mollie_methods_applepay',
-        'mollie_methods_mybank',
+        'mollie_methods_sofort',
+        'mollie_methods_voucher',
     ];
     /**
      * @var array
@@ -171,7 +175,7 @@ class MollieConfigProvider implements ConfigProviderInterface
      *
      * @return array
      */
-    public function getConfig()
+    public function getConfig(): array
     {
         $store = $this->storeManager->getStore();
         $storeId = $store->getId();
@@ -182,8 +186,10 @@ class MollieConfigProvider implements ConfigProviderInterface
         $config['payment']['mollie']['profile_id'] = $this->config->getProfileId($storeId);
         $config['payment']['mollie']['locale'] = $this->getLocale($storeId);
         $config['payment']['mollie']['creditcard']['use_components'] = $this->config->creditcardUseComponents($storeId);
-        $config['payment']['mollie']['appleypay']['integration_type'] = $this->config->applePayIntegrationType($storeId);
+        $config['payment']['mollie']['applepay']['integration_type'] = $this->config->applePayIntegrationType($storeId);
         $config['payment']['mollie']['store']['name'] = $storeName;
+        $config['payment']['mollie']['store']['currency'] = $this->config->getStoreCurrency($storeId);
+        $config['payment']['mollie']['vault']['enabled'] = $this->config->isMagentoVaultEnabled($storeId);
         $apiKey = $this->mollieHelper->getApiKey();
         $useImage = $this->mollieHelper->useImage();
 
@@ -202,7 +208,6 @@ class MollieConfigProvider implements ConfigProviderInterface
             }
 
             $isAvailable = $this->methods[$code]->isActive();
-            $config['payment']['instructions'][$code] = $this->getInstructions($code);
 
             $config['payment']['image'][$code] = '';
             if ($useImage) {
@@ -223,12 +228,12 @@ class MollieConfigProvider implements ConfigProviderInterface
     }
 
     /**
-     * @param \Mollie\Api\MollieApiClient $mollieApi
+     * @param MollieApiClient $mollieApi
      * @param CartInterface|null $cart
      *
      * @return array
      */
-    public function getActiveMethods($mollieApi, CartInterface $cart = null)
+    public function getActiveMethods(MollieApiClient $mollieApi, CartInterface $cart = null): array
     {
         if (!$cart) {
             $cart = $this->checkoutSession->getQuote();
@@ -246,8 +251,9 @@ class MollieConfigProvider implements ConfigProviderInterface
                 'resource' => 'orders',
                 'includeWallets' => 'applepay',
             ];
-            $apiMethods = $mollieApi->methods->allActive($this->methodParameters->enhance($parameters, $cart));
 
+            $this->methodData = [];
+            $apiMethods = $mollieApi->methods->allActive($this->methodParameters->enhance($parameters, $cart));
             foreach ($apiMethods as $method) {
                 $methodId = 'mollie_methods_' . $method->id;
                 $this->methodData[$methodId] = [
@@ -255,23 +261,11 @@ class MollieConfigProvider implements ConfigProviderInterface
                 ];
             }
         } catch (\Exception $e) {
-            $this->mollieHelper->addTolog('error', 'Function: getActiveMethods: ' . $e->getMessage());
+            $this->mollieHelper->addTolog('info', 'Function: getActiveMethods: ' . $e->getMessage());
             $this->methodData = [];
         }
 
         return $this->methodData;
-    }
-
-    /**
-     * Instruction data
-     *
-     * @param $code
-     *
-     * @return string
-     */
-    protected function getInstructions($code)
-    {
-        return nl2br($this->escaper->escapeHtml($this->methods[$code]->getInstructions()));
     }
 
     /**

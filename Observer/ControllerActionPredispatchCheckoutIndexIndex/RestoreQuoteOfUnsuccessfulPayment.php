@@ -10,7 +10,6 @@ use Magento\Checkout\Model\Session;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Sales\Api\Data\OrderInterface;
-use Magento\Sales\Model\Order;
 use Mollie\Payment\Config;
 use Mollie\Payment\Model\Mollie;
 
@@ -43,10 +42,12 @@ class RestoreQuoteOfUnsuccessfulPayment implements ObserverInterface
             return;
         }
 
-        if ($order->getState() === Order::STATE_NEW &&
-            $order->getStatus() === $this->config->orderStatusPending($order->getStoreId())
-        ) {
-            $this->checkoutSession->restoreQuote();
+        $mollieSucces = $payment->getAdditionalInformation('mollie_success');
+        if ($mollieSucces === null || $mollieSucces === true) {
+            return;
         }
+
+        $this->checkoutSession->restoreQuote();
+        $this->config->addToLog('info', 'Restored quote of order ' . $order->getIncrementId());
     }
 }

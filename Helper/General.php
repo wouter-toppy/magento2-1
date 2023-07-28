@@ -9,6 +9,7 @@ namespace Mollie\Payment\Helper;
 use Magento\Framework\App\Helper\AbstractHelper;
 use Magento\Framework\App\Helper\Context;
 use Magento\Framework\App\ProductMetadataInterface;
+use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Locale\Resolver;
 use Magento\Framework\Math\Random as MathRandom;
 use Magento\Framework\Module\ModuleListInterface;
@@ -43,26 +44,26 @@ class General extends AbstractHelper
     const CURRENCIES_WITHOUT_DECIMAL = ['JPY'];
     const SUPPORTED_LOCAL = [
         'en_US',
-        'nl_NL',
-        'nl_BE',
-        'fr_FR',
-        'fr_BE',
-        'de_DE',
+        'ca_ES',
+        'da_DK',
         'de_AT',
         'de_CH',
+        'de_DE',
         'es_ES',
-        'ca_ES',
-        'pt_PT',
-        'it_IT',
-        'nb_NO',
-        'sv_SE',
         'fi_FI',
-        'da_DK',
-        'is_IS',
+        'fr_BE',
+        'fr_FR',
         'hu_HU',
-        'pl_PL',
+        'it_IT',
+        'is_IS',
         'lv_LV',
-        'lt_LT'
+        'lt_LT',
+        'nb_NO',
+        'nl_NL',
+        'nl_BE',
+        'pl_PL',
+        'pt_PT',
+        'sv_SE',
     ];
 
     const XML_PATH_MODULE_ACTIVE = 'payment/mollie_general/enabled';
@@ -70,6 +71,7 @@ class General extends AbstractHelper
     const XML_PATH_LIVE_APIKEY = 'payment/mollie_general/apikey_live';
     const XML_PATH_TEST_APIKEY = 'payment/mollie_general/apikey_test';
     const XML_PATH_DEBUG = 'payment/mollie_general/debug';
+    // Deprecated option
     const XML_PATH_LOADING_SCREEN = 'payment/mollie_general/loading_screen';
     const XML_PATH_STATUS_PROCESSING = 'payment/mollie_general/order_status_processing';
     const XML_PATH_STATUS_PENDING = 'payment/mollie_general/order_status_pending';
@@ -80,7 +82,6 @@ class General extends AbstractHelper
     const XML_PATH_LOCALE = 'payment/mollie_general/locale';
     const XML_PATH_IMAGES = 'payment/mollie_general/payment_images';
     const XML_PATH_USE_BASE_CURRENCY = 'payment/mollie_general/currency';
-    const XML_PATH_SHOW_TRANSACTION_DETAILS = 'payment/mollie_general/transaction_details';
     const XML_PATH_ADD_QR = 'payment/mollie_methods_ideal/add_qr';
     const XML_PATH_PAYMENTLINK_ADD_MESSAGE = 'payment/mollie_methods_paymentlink/add_message';
     const XML_PATH_PAYMENTLINK_MESSAGE = 'payment/mollie_methods_paymentlink/message';
@@ -172,6 +173,11 @@ class General extends AbstractHelper
     private $cancelOrder;
 
     /**
+     * @var EncryptorInterface
+     */
+    private $encryptor;
+
+    /**
      * General constructor.
      *
      * @param Context $context
@@ -193,6 +199,7 @@ class General extends AbstractHelper
      * @param Uncancel $uncancel
      * @param TransactionDescription $transactionDescription
      * @param CancelOrder $cancelOrder
+     * @param EncryptorInterface $encryptor
      */
     public function __construct(
         Context $context,
@@ -213,7 +220,8 @@ class General extends AbstractHelper
         Transaction $transaction,
         Uncancel $uncancel,
         TransactionDescription $transactionDescription,
-        CancelOrder $cancelOrder
+        CancelOrder $cancelOrder,
+        EncryptorInterface $encryptor
     ) {
         $this->paymentHelper = $paymentHelper;
         $this->storeManager = $storeManager;
@@ -234,6 +242,7 @@ class General extends AbstractHelper
         $this->uncancel = $uncancel;
         $this->transactionDescription = $transactionDescription;
         $this->cancelOrder = $cancelOrder;
+        $this->encryptor = $encryptor;
         parent::__construct($context);
     }
 
@@ -246,7 +255,7 @@ class General extends AbstractHelper
      */
     public function isAvailable($storeId)
     {
-        $active = $this->getStoreConfig(self::XML_PATH_MODULE_ACTIVE, $storeId);
+        $active = $this->config->isModuleEnabled($storeId);
         if (!$active) {
             return false;
         }
@@ -292,19 +301,22 @@ class General extends AbstractHelper
         $modus = $this->getModus($storeId);
 
         if ($modus == 'test') {
-            $apiKey = trim($this->getStoreConfig(self::XML_PATH_TEST_APIKEY, $storeId));
+            $apiKey = trim($this->getStoreConfig(self::XML_PATH_TEST_APIKEY, $storeId) ?? '');
             if (empty($apiKey)) {
                 $this->addTolog('error', 'Mollie API key not set (test modus)');
             }
+
             if (!preg_match('/^test_\w+$/', $apiKey)) {
                 $this->addTolog('error', 'Mollie set to test modus, but API key does not start with "test_"');
             }
+
             $this->apiKey[$storeId] = $apiKey;
         } else {
-            $apiKey = trim($this->getStoreConfig(self::XML_PATH_LIVE_APIKEY, $storeId));
+            $apiKey = trim($this->getStoreConfig(self::XML_PATH_LIVE_APIKEY, $storeId) ?? '');
             if (empty($apiKey)) {
                 $this->addTolog('error', 'Mollie API key not set (live modus)');
             }
+
             if (!preg_match('/^live_\w+$/', $apiKey)) {
                 $this->addTolog('error', 'Mollie set to live modus, but API key does not start with "live_"');
             }
@@ -346,6 +358,7 @@ class General extends AbstractHelper
      * @param $storeId
      *
      * @return mixed
+     * @deprecated since 2.18.0
      */
     public function useLoadingScreen($storeId)
     {
@@ -400,18 +413,19 @@ class General extends AbstractHelper
     /**
      * Method code for API
      *
-     * @param \Magento\Sales\Model\Order $order
+     * @param OrderInterface $order
      *
-     * @return mixed
+     * @return string
      */
-    public function getMethodCode($order)
+    public function getMethodCode($order): string
     {
         $method = $order->getPayment()->getMethodInstance()->getCode();
 
-        if ($method != 'mollie_methods_paymentlink') {
-            $methodCode = str_replace('mollie_methods_', '', $method);
-            return $methodCode;
+        if ($method == 'mollie_methods_paymentlink' || strstr($method, 'mollie_methods') === false) {
+            return '';
         }
+
+        return str_replace('mollie_methods_', '', $method);
     }
 
     /***
@@ -422,16 +436,9 @@ class General extends AbstractHelper
     public function getApiMethod($order)
     {
         $method = $order->getPayment()->getMethodInstance()->getCode();
+        $method = str_replace('_vault', '', $method);
         $methodXpath = str_replace('%method%', $method, self::XML_PATH_API_METHOD);
         return $this->getStoreConfig($methodXpath, $order->getStoreId());
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getPaymentToken()
-    {
-        return $this->mathRandom->getUniqueHash();
     }
 
     /**
@@ -450,19 +457,6 @@ class General extends AbstractHelper
         $order = $this->orderRepository->get($orderId);
 
         return $this->transaction->getRedirectUrl($order, $paymentToken);
-    }
-
-    /**
-     * Webhook Url Builder
-     *
-     * @return string
-     *
-     * @deprecated since 1.8.1
-     * @see Transaction::getWebhookUrl()
-     */
-    public function getWebhookUrl()
-    {
-        return $this->transaction->getWebhookUrl();
     }
 
     /**
@@ -550,11 +544,11 @@ class General extends AbstractHelper
     /**
      * Order Currency and Value array for payment request
      *
-     * @param \Magento\Sales\Model\Order $order
+     * @param OrderInterface $order
      *
-     * @return array
+     * @return array{currency: string, value: string}
      */
-    public function getOrderAmountByOrder($order)
+    public function getOrderAmountByOrder(OrderInterface $order): array
     {
         if ($this->useBaseCurrency($order->getStoreId())) {
             return $this->getAmountArray($order->getBaseCurrencyCode(), $order->getBaseGrandTotal());
@@ -574,16 +568,16 @@ class General extends AbstractHelper
     }
 
     /**
-     * @param $currency
-     * @param $value
+     * @param string|null $currency
+     * @param float|null $value
      *
-     * @return array
+     * @return array{currency: string, value: string}
      */
-    public function getAmountArray($currency, $value)
+    public function getAmountArray(?string $currency, ?float $value): array
     {
         return [
-            "currency" => $currency,
-            "value"    => $this->formatCurrencyValue($value, $currency)
+            'currency' => $currency,
+            'value'    => $this->formatCurrencyValue($value, $currency)
         ];
     }
 
@@ -600,7 +594,7 @@ class General extends AbstractHelper
             $decimalPrecision = 0;
         }
 
-        return number_format($value, $decimalPrecision, '.', '');
+        return number_format($value ?? 0.0, $decimalPrecision, '.', '');
     }
 
     /**
@@ -663,6 +657,8 @@ class General extends AbstractHelper
             $dueDate->modify('+' . $dueDays . ' day');
             return $dueDate->format('Y-m-d');
         }
+
+        return false;
     }
 
     /**
@@ -680,14 +676,18 @@ class General extends AbstractHelper
             'mollie_methods_bancontact',
             'mollie_methods_banktransfer',
             'mollie_methods_belfius',
+            'mollie_methods_billie',
             'mollie_methods_creditcard',
             'mollie_methods_directdebit',
             'mollie_methods_eps',
             'mollie_methods_giftcard',
             'mollie_methods_giropay',
             'mollie_methods_ideal',
+            'mollie_methods_in3',
             'mollie_methods_kbc',
+            'mollie_methods_klarna',
             'mollie_methods_klarnapaylater',
+            'mollie_methods_klarnapaynow',
             'mollie_methods_klarnasliceit',
             'mollie_methods_voucher',
             'mollie_methods_mybank',
@@ -875,17 +875,6 @@ class General extends AbstractHelper
                 $this->couponUsage->updateCustomerCouponTimesUsed($customerId, $this->coupon->getId(), false);
             }
         }
-    }
-
-    /**
-     * @param string $method
-     * @param string $orderNumber
-     * @param int $storeId
-     * @return string
-     */
-    public function getPaymentDescription(string $method, string $orderNumber, $storeId = 0)
-    {
-        return $this->transactionDescription->forRegularTransaction($method, $orderNumber, $storeId);
     }
 
     /**

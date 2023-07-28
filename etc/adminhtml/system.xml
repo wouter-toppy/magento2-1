@@ -55,17 +55,19 @@
                     <source_model>Mollie\Payment\Model\Adminhtml\Source\ApiKey</source_model>
                     <config_path>payment/mollie_general/type</config_path>
                 </field>
-                <field id="apikey_test" translate="label" type="text" sortOrder="30" showInDefault="1"
+                <field id="apikey_test" translate="label" type="obscure" sortOrder="30" showInDefault="1"
                        showInWebsite="1" showInStore="1">
                     <label>Test API Key</label>
-                    <backend_model>Mollie\Payment\Model\Adminhtml\Backend\FlushMollieCache</backend_model>
+                    <backend_model>Mollie\Payment\Model\Adminhtml\Backend\SaveApiKey</backend_model>
                     <config_path>payment/mollie_general/apikey_test</config_path>
+                    <comment model="Mollie\Payment\Model\Adminhtml\Comment\CurrentApiKeyMeta" />
                 </field>
-                <field id="apikey_live" translate="label" type="text" sortOrder="40" showInDefault="1"
+                <field id="apikey_live" translate="label" type="obscure" sortOrder="40" showInDefault="1"
                        showInWebsite="1" showInStore="1">
                     <label>Live API Key</label>
-                    <backend_model>Mollie\Payment\Model\Adminhtml\Backend\FlushMollieCache</backend_model>
+                    <backend_model>Mollie\Payment\Model\Adminhtml\Backend\SaveApiKey</backend_model>
                     <config_path>payment/mollie_general/apikey_live</config_path>
+                    <comment model="Mollie\Payment\Model\Adminhtml\Comment\CurrentApiKeyMeta" />
                 </field>
                 <field id="profileid" translate="label" type="text" sortOrder="50" showInDefault="1"
                        showInWebsite="1" showInStore="1">
@@ -85,18 +87,26 @@
             <group id="settings" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="1"
                    showInStore="1">
                 <label>Settings</label>
-                <field id="payment_images" translate="label" type="select" sortOrder="10" showInDefault="1"
+                <field id="enable_magento_vault" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Magento Vault</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <config_path>payment/mollie_general/enable_magento_vault</config_path>
+                    <comment><![CDATA[Magento Vault allows users to save their payment method data for re-use.<br><strong>Warning:</strong> This will only work when the CreditCard <strong>method</strong> setting is set to <strong>Orders API</strong>]]></comment>
+                </field>
+
+                <field id="payment_images" translate="label" type="select" sortOrder="20" showInDefault="1"
                        showInWebsite="1" showInStore="1">
                     <label>Show Icons</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <config_path>payment/mollie_general/payment_images</config_path>
                     <comment><![CDATA[Show Payment Icons on Checkout]]></comment>
                 </field>
-                <field id="default_selected_method" translate="label" type="select" sortOrder="20" showInDefault="1"
+                <field id="default_selected_method" translate="label" type="select" sortOrder="30" showInDefault="1"
                        showInWebsite="0" showInStore="1">
                     <label>Default selected method</label>
                     <source_model>Mollie\Payment\Model\Adminhtml\Source\MolliePaymentMethod</source_model>
                     <config_path>payment/mollie_general/default_selected_method</config_path>
+                    <backend_model>Mollie\Payment\Model\Adminhtml\Backend\PreventSavingWhenIoscOneStepCheckoutIsActive</backend_model>
                 </field>
             </group>
 
@@ -170,23 +180,44 @@
                     <label>When to create the invoice?</label>
                     <source_model>Mollie\Payment\Model\Adminhtml\Source\InvoiceMoment</source_model>
                     <config_path>payment/mollie_general/invoice_moment</config_path>
-                    <comment><![CDATA[When do you want create the invoice for <strong>Klarna Payments</strong>?<br><strong>On Authorize</strong>: Create a full invoice when the order is authorized.<br><strong>On Shipment</strong>: Create a (partial) invoice when a shipment is created.]]></comment>
+                    <comment><![CDATA[When do you want to create the invoice for <strong>Klarna</strong> or <strong>Billie</strong> payments?<br><strong>On Authorize</strong>: Create a full invoice when the order is authorized.<br><strong>On Shipment</strong>: Create a (partial) invoice when a shipment is created.]]></comment>
                 </field>
-                <field id="invoice_notify" translate="label comment" type="select" sortOrder="20" showInDefault="1"
+                <field id="enable_manual_capture" translate="label comment" type="select" sortOrder="20" showInDefault="1"
+                       showInWebsite="1" showInStore="1">
+                    <label>Manual Capture</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <config_path>payment/mollie_general/enable_manual_capture</config_path>
+                    <comment><![CDATA[This option allows you to temporarily secure payment from your customer without collecting the funds immediately. The amount is captured when the shipment is created.<br><strong>Note:</strong> This only works with creditcards when the Payments API is enabled and is currently only available for specified merchants.]]></comment>
+                </field>
+                <field id="invoice_notify" translate="label comment" type="select" sortOrder="30" showInDefault="1"
                        showInWebsite="1" showInStore="1">
                     <label>Send Invoice Email</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <config_path>payment/mollie_general/invoice_notify</config_path>
-                    <comment><![CDATA[Set to yes to send the invoice email to the customer after the invoice is created.]]></comment>
+                    <comment><![CDATA[Set to yes to send the invoice email to the customer after the invoice is created.<br><strong>Note:</strong> Klarna has an extra option for this.]]></comment>
                 </field>
-                <field id="cancel_failed_orders" translate="label" type="select" sortOrder="30" showInDefault="1"
+                <field id="invoice_notify_klarna" translate="label comment" type="select" sortOrder="40" showInDefault="1"
+                       showInWebsite="1" showInStore="1">
+                    <label>Send Invoice Email For Klarna Orders</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <config_path>payment/mollie_general/invoice_notify_klarna</config_path>
+                    <comment><![CDATA[Set to yes to send the invoice email to the customer after the invoice is created, when paid with Klarna.]]></comment>
+                </field>
+                <field id="cancel_failed_orders" translate="label" type="select" sortOrder="50" showInDefault="1"
                        showInWebsite="0" showInStore="1">
                     <label>Cancel order when connection Fails</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <config_path>payment/mollie_general/cancel_failed_orders</config_path>
                     <comment><![CDATA[When the order can't be created due to various reasons (connection failure or data verification errors), the just created order will be canceled.]]></comment>
                 </field>
-                <field id="include_shipping_in_surcharge" translate="label" type="select" sortOrder="40" showInDefault="1"
+                <field id="redirect_when_transaction_fails_to" translate="label" type="select" sortOrder="60" showInDefault="1"
+                       showInWebsite="0" showInStore="1">
+                    <label>Redirect user when redirect fails</label>
+                    <source_model>Mollie\Payment\Model\Adminhtml\Source\RedirectUserWhenTransactionFails</source_model>
+                    <config_path>payment/mollie_general/redirect_when_transaction_fails_to</config_path>
+                    <comment><![CDATA[When the transaction fails due to various reasons (i.e., Cancelled, insufficient funds, etc.), where do we need to redirect the user? Please be cautious: Depending on the used checkout, error messages may not be displayed.]]></comment>
+                </field>
+                <field id="include_shipping_in_surcharge" translate="label" type="select" sortOrder="70" showInDefault="1"
                        showInWebsite="0" showInStore="1">
                     <label>Include shipping in Surcharge calculation</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
@@ -196,49 +227,42 @@
                         <strong>Yes</strong>: The surcharge is calculated on the total of subtotal + shipping.
                     ]]></comment>
                 </field>
-                <field id="currency" translate="label" type="select" sortOrder="50" showInDefault="1"
+                <field id="currency" translate="label" type="select" sortOrder="80" showInDefault="1"
                        showInWebsite="1" showInStore="1">
                     <label>Use Base Currency</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <config_path>payment/mollie_general/currency</config_path>
                     <comment>Force use of base currency for the payment request. Is set to no the selected currency of the storeview will be used for request.</comment>
                 </field>
-                <field id="locale" translate="label comment" type="select" sortOrder="60" showInDefault="1"
+                <field id="locale" translate="label comment" type="select" sortOrder="90" showInDefault="1"
                        showInWebsite="1" showInStore="1">
                     <label>Language Payment Page</label>
                     <source_model>Mollie\Payment\Model\Adminhtml\Source\Locale</source_model>
                     <config_path>payment/mollie_general/locale</config_path>
-                    <comment><![CDATA[Let Mollie automatically detect the language or force the language from the store view.]]></comment>
+                    <comment><![CDATA[<strong>Autodetect:</strong> Let Mollie detect the locale depending on the user. However, the locale from the current store view is used when using the Orders API for the used payment method.<br>
+<strong>Store Locale</strong>: Use the locale active in the current store or fall back to English if this can't be determined.]]></comment>
                 </field>
-                <field id="transaction_details" translate="label" type="select" sortOrder="70" showInDefault="1"
-                       showInWebsite="0" showInStore="0">
-                    <label>Show Transaction Details</label>
-                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment>Display Transaction Details like e.g. IBAN, BIC, Paypal Reference, Card Holder etc.</comment>
-                </field>
-                <field id="loading_screen" translate="label" type="select" sortOrder="80" showInDefault="1"
-                       showInWebsite="1" showInStore="1">
-                    <label>Use Loading Screen</label>
-                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <config_path>payment/mollie_general/loading_screen</config_path>
-                    <comment><![CDATA[Use loading screen before redirect. This will enable mobile users to use the back button.]]></comment>
-                </field>
-                <field id="use_webhooks" translate="label" type="select" sortOrder="220" showInDefault="1"
+                <field id="use_webhooks" translate="label" type="select" sortOrder="100" showInDefault="1"
                        showInWebsite="0" showInStore="1">
                     <label>Use webhooks</label>
                     <source_model>Mollie\Payment\Model\Adminhtml\Source\WebhookUrlOptions</source_model>
                     <config_path>payment/mollie_general/use_webhooks</config_path>
-                    <comment><![CDATA[
-                            <strong>Note:</strong> This setting has only effect when the store deploy mode is in <u>development</u>. When the store deploy mode is in production, this setting is ignored and the webhooks are always <u>enabled</u>.
-                        ]]></comment>
+                    <comment><![CDATA[<strong>Note:</strong> This URL will be called from the Mollie servers when an order has an update (paid, canceled, etc.). Only alter this setting when you have a headless webshop or working in a local environment.]]></comment>
                 </field>
-                <field id="custom_webhook_url" translate="label" type="text" sortOrder="230" showInDefault="1"
+                <field id="custom_webhook_url" translate="label" type="text" sortOrder="110" showInDefault="1"
                        showInWebsite="0" showInStore="1">
                     <label>Custom webhook url</label>
                     <config_path>payment/mollie_general/custom_webhook_url</config_path>
                     <depends>
                         <field id="use_webhooks">custom_url</field>
                     </depends>
+                </field>
+                <field id="encrypt_payment_details" translate="label" type="select" sortOrder="120" showInDefault="1"
+                       showInWebsite="0" showInStore="1">
+                    <label>Encrypt payment details</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <config_path>payment/mollie_general/encrypt_payment_details</config_path>
+                    <comment><![CDATA[Each order has extra information, name of the card, etc. When setting this option to Yes, this information will be encrypted before it is being saved.]]></comment>
                 </field>
             </group>
 
@@ -332,6 +356,25 @@
                         <field id="enable_second_chance_email">1</field>
                     </depends>
                     <comment><![CDATA[Configure the delay in hours when the "second chance email" should be sent.]]></comment>
+                </field>
+                <field id="second_chance_use_payment_method" translate="label" type="select" sortOrder="50" showInDefault="1"
+                       showInWebsite="0" showInStore="1" canRestore="1">
+                    <label>Payment Method To Use For Second Change Payments</label>
+                    <source_model>Mollie\Payment\Model\Adminhtml\Source\SecondChancePaymentMethod</source_model>
+                    <config_path>payment/mollie_general/second_chance_use_payment_method</config_path>
+                    <depends>
+                        <field id="enable_second_chance_email">1</field>
+                    </depends>
+                    <comment><![CDATA[If the original order is canceled, a new order is created when the customer clicks the "second chance email". The payment method here is used in that case.]]></comment>
+                </field>
+                <field id="second_chance_send_bcc_to" translate="label comment" type="text" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Send BCC to</label>
+                    <config_path>payment/mollie_general/second_chance_send_bcc_to</config_path>
+                    <comment><![CDATA[<strong>Optional</strong> Comma separated list of emailaddresses. Leave empty to disable.]]></comment>
+                    <validate>validate-emails</validate>
+                    <depends>
+                        <field id="enable_second_chance_email">1</field>
+                    </depends>
                 </field>
             </group>
         </section>

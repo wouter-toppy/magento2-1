@@ -8,7 +8,9 @@ namespace Mollie\Payment\Controller\Adminhtml\Action;
 
 use Magento\Backend\App\Action;
 use Magento\Backend\App\Action\Context;
+use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Controller\Result\JsonFactory;
+use Magento\Store\Model\ScopeInterface;
 use Mollie\Payment\Helper\General as MollieHelper;
 use Mollie\Payment\Helper\Tests as TestsHelper;
 
@@ -38,23 +40,32 @@ class Apikey extends Action
     private $mollieHelper;
 
     /**
+     * @var ScopeConfigInterface
+     */
+    private $scopeConfig;
+
+    /**
      * Apikey constructor.
      *
-     * @param Context      $context
-     * @param JsonFactory  $resultJsonFactory
-     * @param TestsHelper  $testsHelper
+     * @param Context $context
+     * @param JsonFactory $resultJsonFactory
+     * @param TestsHelper $testsHelper
      * @param MollieHelper $mollieHelper
+     * @param ScopeConfigInterface $scopeConfig
      */
     public function __construct(
         Context $context,
         JsonFactory $resultJsonFactory,
         TestsHelper $testsHelper,
-        MollieHelper $mollieHelper
+        MollieHelper $mollieHelper,
+        ScopeConfigInterface $scopeConfig
     ) {
         $this->request = $context->getRequest();
         $this->resultJsonFactory = $resultJsonFactory;
         $this->testsHelper = $testsHelper;
         $this->mollieHelper = $mollieHelper;
+        $this->scopeConfig = $scopeConfig;
+
         parent::__construct($context);
     }
 
@@ -71,8 +82,8 @@ class Apikey extends Action
             return $result;
         }
 
-        $testKey = $this->request->getParam('test_key');
-        $liveKey = $this->request->getParam('live_key');
+        $testKey = $this->getKey('test');
+        $liveKey = $this->getKey('live');
         $results = $this->testsHelper->getMethods($testKey, $liveKey);
 
         return $result->setData(['success' => true, 'msg' => implode('<br/>', $results)]);
@@ -84,5 +95,14 @@ class Apikey extends Action
     protected function _isAllowed()
     {
         return $this->_authorization->isAllowed('Mollie_Payment::config');
+    }
+
+    private function getKey(string $type): string
+    {
+        if (!$this->request->getParam($type . '_key') || $this->request->getParam($type . '_key') == '******') {
+            return $this->scopeConfig->getValue('payment/mollie_general/apikey_' . $type, ScopeInterface::SCOPE_STORE);
+        }
+
+        return $this->request->getParam($type . '_key');
     }
 }

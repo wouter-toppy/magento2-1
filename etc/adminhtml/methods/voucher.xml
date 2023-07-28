@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <include xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_include.xsd">
-    <group id="mollie_methods_voucher" translate="label" type="text" sortOrder="220" showInDefault="1"
+    <group id="mollie_methods_voucher" translate="label" type="text" sortOrder="250" showInDefault="1"
            showInWebsite="1" showInStore="1">
         <label>Voucher</label>
         <field id="active" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1"
@@ -21,10 +21,7 @@
         <field id="payment_description" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
             <label>Description</label>
             <config_path>payment/mollie_methods_voucher/payment_description</config_path>
-            <comment><![CDATA[The description to be used for this transaction. These variables are available:<br><br>
-            <strong>{ordernumber}</strong>: The order number for this transaction<br>
-            <strong>{storename}</strong>: The name of the store<br><br>
-            ]]></comment>
+            <comment model="Mollie\Payment\Model\Adminhtml\Comment\AvailableDescriptionVariables"/>
             <depends>
                 <field id="method">payment</field>
                 <field id="active">1</field>
@@ -53,7 +50,7 @@
         <field id="days_before_expire" translate="label" type="text" sortOrder="60" showInDefault="1" showInWebsite="1"
                showInStore="1">
             <label>Days to expire</label>
-            <frontend_class>validate-digits-range digits-range-1-100</frontend_class>
+            <frontend_class>validate-digits-range digits-range-1-365</frontend_class>
             <config_path>payment/mollie_methods_voucher/days_before_expire</config_path>
             <depends>
                 <field id="active">1</field>

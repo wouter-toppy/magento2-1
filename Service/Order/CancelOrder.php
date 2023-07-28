@@ -11,24 +11,17 @@ use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Api\OrderManagementInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
+use Magento\Sales\Model\Order\StatusResolver;
 use Magento\SalesRule\Model\Coupon;
 use Magento\SalesRule\Model\ResourceModel\Coupon\Usage;
 use Mollie\Payment\Config;
-use Mollie\Payment\Service\LockService;
 
 class CancelOrder
 {
-    const LOCK_NAME = 'mollie.order.cancel.%s';
-
     /**
      * @var Config
      */
     private $config;
-
-    /**
-     * @var LockService
-     */
-    private $lockService;
 
     /**
      * @var OrderCommentHistory
@@ -56,27 +49,32 @@ class CancelOrder
     private $couponUsage;
 
     /**
+     * @var StatusResolver
+     */
+    private $statusResolver;
+
+    /**
      * @var ResourceConnection
      */
     private $resource;
 
     public function __construct(
         Config $config,
-        LockService $lockService,
         OrderCommentHistory $orderCommentHistory,
         OrderManagementInterface $orderManagement,
         OrderRepositoryInterface $orderRepository,
         Coupon $coupon,
         Usage $couponUsage,
+        StatusResolver $statusResolver,
         ResourceConnection $resource
     ) {
         $this->config = $config;
-        $this->lockService = $lockService;
         $this->orderCommentHistory = $orderCommentHistory;
         $this->orderManagement = $orderManagement;
         $this->orderRepository = $orderRepository;
         $this->coupon = $coupon;
         $this->couponUsage = $couponUsage;
+        $this->statusResolver = $statusResolver;
         $this->resource = $resource;
     }
 
@@ -86,39 +84,25 @@ class CancelOrder
             return false;
         }
 
-        $key = sprintf(static::LOCK_NAME, $order->getId());
-        if ($this->lockService->isLocked($key)) {
-            $this->config->addToLog('info', sprintf('Key "%s" is locked', $key));
-            return false;
-        }
-
-        // Lock for 5 minutes.
-        $this->config->addToLog('info', sprintf('Getting lock for key "%s"', $key));
-        $this->lockService->lock($key, 5 * 60);
-
         if ($this->isAlreadyCancelled($order)) {
             return false;
         }
 
-        try {
-            $comment = __('The order was canceled');
-            if ($reason !== null) {
-                $comment = __('The order was canceled, reason: payment %1', $reason);
-            }
+        $comment = __('The order was canceled');
+        if ($reason !== null) {
+            $comment = __('The order was canceled, reason: payment %1', $reason);
+        }
 
-            $this->config->addToLog('info', $order->getIncrementId() . ' ' . $comment);
-            $this->orderCommentHistory->add($order, $comment);
-            $order->getPayment()->setMessage($comment);
-            $this->orderRepository->save($order);
+        $order->setStatus($this->statusResolver->getOrderStatusByState($order, Order::STATE_CANCELED));
+        $this->config->addToLog('info', $order->getIncrementId() . ' ' . $comment);
+        $this->orderCommentHistory->add($order, $comment);
+        $order->getPayment()->setMessage($comment);
+        $this->orderRepository->save($order);
 
-            $this->orderManagement->cancel($order->getId());
+        $this->orderManagement->cancel($order->getId());
 
-            if ($order->getCouponCode()) {
-                $this->resetCouponAfterCancellation($order);
-            }
-        } finally {
-            $this->config->addToLog('info', sprintf('Unlocking key "%s"', $key));
-            $this->lockService->unlock($key);
+        if ($order->getCouponCode()) {
+            $this->resetCouponAfterCancellation($order);
         }
 
         return true;
